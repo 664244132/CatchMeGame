@@ -17,10 +17,16 @@
 | **07** | Refactor โค้ดตามกฎเหล็ก 15 ข้อใน `REFACTORCODE.md` (Zero-GC Particles, Discriminated Union Types, Guard Clauses) | สำเร็จ |
 | **08** | ปรับปรุงคู่มือเอกสารทั้งหมดใน `markdowns/` ให้ตรงกับโครงสร้างจริง 100% (AboutProject, DEBUG, PROJECT, GameDetails, USE_CASE) | สำเร็จ |
 | **09** | ปรับเวลาระเบิดเป็น 15 วินาที และแก้ไขระบบเข้าร่วมห้อง (Handshake ACK, Room Registry Fallback, Auto-Retry) ป้องกันการหมุนค้าง | สำเร็จ |
+| **10** | ปรับแต่ง Vite Build Config (`chunkSizeWarningLimit: 1000` และ Code Splitting `manualChunks` สำหรับ Three.js และ React) กำจัด Chunk Size Warning | สำเร็จ |
 
 ---
 
 ## 🚀 ประวัติการปรับปรุงรอบปัจจุบัน (Current Active Session)
+
+### 🔹 การแก้ไข Chunk Size Warning ใน Vite Build
+- **[vite.config.ts](file:///C:/Users/k2pwm/Downloads/CatchMeGame/vite.config.ts):**
+  - กำหนด `chunkSizeWarningLimit: 1000` (ขยายเพดานแจ้งเตือนจาก 500 kB เป็น 1,000 kB)
+  - กำหนด `rollupOptions.output.manualChunks` แยกไลบรารีขนาดใหญ่ (`three` และ `react/react-dom`) ออกเป็น chunk ต่างหาก ช่วยเพิ่มประสิทธิภาพการทำ Caching ในเบราว์เซอร์และขจัด Warning อย่างสมบูรณ์
 
 ### 🔹 การแก้ไขระบบ Join ห้อง และปรับเวลาระเบิด 15 วินาที
 - **[src/game/constants.ts](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/game/constants.ts):**
