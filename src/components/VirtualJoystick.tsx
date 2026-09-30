@@ -142,11 +142,14 @@ export default function VirtualJoystick({ dashCooldown }: Props) {
   return (
     <div className="absolute inset-0 pointer-events-none select-none z-30">
       {/* ────────────────────────────────────────────────────────────────── */}
-      {/* 1. VIRTUAL JOYSTICK (ฝั่งซ้ายล่างสำหรับบังคับทิศทาง) */}
+      {/* 1. VIRTUAL JOYSTICK (ฝั่งซ้ายล่างสำหรับบังคับทิศทาง - ยกสูงพ้นขอบล่างจอ) */}
       {/* ────────────────────────────────────────────────────────────────── */}
       <div
-        className="absolute left-4 sm:left-8 bottom-6 sm:bottom-8 pointer-events-auto"
-        style={{ touchAction: 'none' }}
+        className="absolute left-4 sm:left-8 pointer-events-auto"
+        style={{
+          bottom: 'max(4.2rem, calc(env(safe-area-inset-bottom, 0px) + 3rem))',
+          touchAction: 'none',
+        }}
       >
         <div
           ref={baseRef}
@@ -183,11 +186,14 @@ export default function VirtualJoystick({ dashCooldown }: Props) {
       </div>
 
       {/* ────────────────────────────────────────────────────────────────── */}
-      {/* 2. ACTION BUTTONS (ฝั่งขวาล่าง: กระโดด Jump และ พุ่ง Dash) */}
+      {/* 2. ACTION BUTTONS (ฝั่งขวาล่าง: กระโดด Jump และ พุ่ง Dash - ยกสูงพ้นขอบล่างจอ) */}
       {/* ────────────────────────────────────────────────────────────────── */}
       <div
-        className="absolute right-4 sm:right-8 bottom-6 sm:bottom-8 pointer-events-auto flex items-end gap-3 sm:gap-4"
-        style={{ touchAction: 'none' }}
+        className="absolute right-4 sm:right-8 pointer-events-auto flex items-end gap-3 sm:gap-4"
+        style={{
+          bottom: 'max(4.2rem, calc(env(safe-area-inset-bottom, 0px) + 3rem))',
+          touchAction: 'none',
+        }}
       >
         {/* ปุ่ม Dash ⚡ (พุ่งตัว) */}
         <button

@@ -184,12 +184,12 @@ export default function HUD({ state, round, totalRounds }: Props) {
       )}
 
       {/* ────────────────────────────────────────────────────────────────── */}
-      {/* 3. YOU ARE IT BANNER (เตือนตัวใหญ่เมื่อถือระเบิด) */}
+      {/* 3. YOU ARE IT BANNER (เตือนแบบกระชับไม่บังจอเมื่อถือระเบิด) */}
       {/* ────────────────────────────────────────────────────────────────── */}
       {humanIsIt && (
-        <div className="absolute top-20 sm:top-24 left-0 right-0 flex justify-center px-4 z-20">
-          <div className="bg-gradient-to-r from-orange-600 via-red-600 to-amber-600 border-2 border-yellow-300 rounded-2xl px-4 py-2 sm:px-7 sm:py-2.5 shadow-[0_0_35px_rgba(255,80,0,0.85)] text-center animate-bounce">
-            <span className="font-display text-white text-base sm:text-2xl drop-shadow-md">
+        <div className={`absolute ${message ? 'top-26 sm:top-28' : 'top-18 sm:top-22'} left-0 right-0 flex justify-center px-4 z-20 pointer-events-none transition-all`}>
+          <div className="bg-gradient-to-r from-orange-600 via-red-600 to-amber-600 border border-yellow-300 rounded-full px-4 py-1.5 sm:px-6 sm:py-2 shadow-[0_0_25px_rgba(255,80,0,0.7)] text-center animate-pulse">
+            <span className="font-display text-white text-xs sm:text-sm drop-shadow">
               ⚡ YOU HAVE THE BOMB! TAG SOMEONE! 💥
             </span>
           </div>
@@ -197,12 +197,14 @@ export default function HUD({ state, round, totalRounds }: Props) {
       )}
 
       {/* ────────────────────────────────────────────────────────────────── */}
-      {/* 4. FLOATING MESSAGE (ข้อความแจ้งเตือนกลางจอ) */}
+      {/* 4. FLOATING MESSAGE (ข้อความแจ้งเตือนด้านบนขนาดกะทัดรัด ไม่บังกลางจอ) */}
       {/* ────────────────────────────────────────────────────────────────── */}
       {message && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-30 px-4 max-w-sm sm:max-w-md w-full">
-          <div className="bg-black/85 border border-white/30 rounded-3xl p-4 sm:p-6 text-center shadow-2xl backdrop-blur-md">
-            <p className="font-display text-white text-xl sm:text-3xl leading-snug">{message}</p>
+        <div className="absolute top-18 sm:top-22 left-1/2 -translate-x-1/2 pointer-events-none z-30 px-3 max-w-[90vw] sm:max-w-lg w-auto transition-all">
+          <div className="bg-black/80 border border-white/25 rounded-full px-4 py-1.5 sm:px-6 sm:py-2 text-center shadow-xl backdrop-blur-md">
+            <p className="font-display text-white text-xs sm:text-base leading-tight tracking-wide whitespace-nowrap overflow-hidden text-ellipsis">
+              {message}
+            </p>
           </div>
         </div>
       )}

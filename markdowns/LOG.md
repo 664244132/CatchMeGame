@@ -20,10 +20,21 @@
 | **10** | ปรับแต่ง Vite Build Config (`chunkSizeWarningLimit: 1000` และ Code Splitting `manualChunks` สำหรับ Three.js และ React) กำจัด Chunk Size Warning | สำเร็จ |
 | **11** | อัปเกรดระบบเชื่อมต่อห้องเป็น WebRTC P2P (PeerJS) เล่นข้ามอุปกรณ์ได้จริง (มือถือ ↔ คอมพิวเตอร์) โดยไม่ใช้ Database พร้อม Dual-Transport Fallback | สำเร็จ |
 | **12** | ปรับปรุงกลไกการส่งต่อระเบิด (Continuous Bomb Countdown): เมื่อแตะส่งต่อระเบิด เวลาจะไม่ถูก Reset แต่นับถอยหลังต่อทันที พร้อมคูลดาวน์ No Tag-backs 1.0s | สำเร็จ |
+| **13** | ปรับปรุง UI แจ้งเตือน (ย้ายขึ้นด้านบน ขนาดกะทัดรัดไม่บังจอ 3D) และปรับตำแหน่งปุ่มควบคุมบนมือถือยกสูงพ้นขอบล่างจอ (Mobile Controls Ergonomics) | สำเร็จ |
 
 ---
 
 ## 🚀 ประวัติการปรับปรุงรอบปัจจุบัน (Current Active Session)
+
+### 🔹 การปรับปรุง UI แจ้งเตือน และปุ่มควบคุมบนหน้าจอมือถือ (Mobile Ergonomics)
+- **[src/components/HUD.tsx](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/components/HUD.tsx):**
+  - ย้ายกล่องแจ้งเตือน `Floating Message` จากกลางจอ (`top-1/2`) ขึ้นไปอยู่ด้านบนใต้แถบเวลา (`top-18 sm:top-22`) ปรับรูปแบบเป็นแถบ Pill Badge ทรงมนขนาดกะทัดรัด ไม่บดบังวิสัยทัศน์ของตัวละคร 3D ในสนาม
+  - ปรับแบนเนอร์ `YOU ARE IT` ให้เป็น Badge แถบโค้งมนขนาดกะทัดรัด วางตำแหน่งต่อจากกล่องแจ้งเตือนอย่างลงตัว
+- **[src/components/VirtualJoystick.tsx](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/components/VirtualJoystick.tsx):**
+  - ยกระดับตำแหน่งของ Virtual Joystick (ซ้าย) และปุ่ม Jump / Dash (ขวา) ขึ้นจากเดิม `bottom-6` เป็น `bottom: max(4.2rem, calc(env(safe-area-inset-bottom, 0px) + 3rem))`
+  - ป้องกันปัญหาปุ่มตกล้นขอบล่างจอ หลบแถบ Navigation Bar, Home Indicator, และ URL bar ของสมาร์ทโฟน 100% ช่วยให้กดสัมผัสได้ถนัดมือ
+- **[src/App.tsx](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/App.tsx):**
+  - ปรับความสูง Container หลักเป็น `h-[100dvh]` เพื่อความแม่นยำของความสูงหน้าจอบนเบราว์เซอร์มือถือ ไม่ให้เนื้อหาตกขอบล่าง
 
 ### 🔹 การปรับปรุงกลไกระเบิดนับถอยหลังต่อเนื่อง (Continuous Bomb Countdown)
 - **[src/game/GameEngine.ts](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/game/GameEngine.ts):**
