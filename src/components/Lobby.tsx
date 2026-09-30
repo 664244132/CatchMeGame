@@ -24,6 +24,8 @@ export default function Lobby({ onStartGame }: Props) {
   const [isHost, setIsHost] = useState(false);
   const [copied, setCopied] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectStatusText, setConnectStatusText] = useState('');
 
   const network = NetworkManager.getInstance();
 
@@ -43,12 +45,38 @@ export default function Lobby({ onStartGame }: Props) {
       onStartGame(payload.totalRounds, payload.playerConfigs, payload.catId, false, localId);
     };
 
+    // ดักฟังการยืนยันเข้าห้องสำเร็จ (ACK)
+    const onJoinSuccess = (payload: { players: LobbyPlayer[]; roomCode: string }) => {
+      setIsConnecting(false);
+      setRoomCode(payload.roomCode);
+      setPlayers(payload.players);
+      setView('WAITING');
+      setErrorMsg('');
+    };
+
+    // ดักฟังกรณีเข้าห้องไม่สำเร็จ / หาห้องไม่พบ (Timeout or Not Found)
+    const onJoinFailed = (payload: { reason: string }) => {
+      setIsConnecting(false);
+      setErrorMsg(payload.reason || 'ไม่พบห้อง หรือไม่สามารถเชื่อมต่อได้');
+    };
+
+    // ดักฟังสถานะระหว่างการเชื่อมต่อ
+    const onJoinStatus = (payload: { message: string }) => {
+      setConnectStatusText(payload.message);
+    };
+
     network.on('lobby_updated', onLobbyUpdated);
     network.on('game_started', onGameStarted);
+    network.on('join_success', onJoinSuccess);
+    network.on('join_failed', onJoinFailed);
+    network.on('join_status', onJoinStatus);
 
     return () => {
       network.off('lobby_updated', onLobbyUpdated);
       network.off('game_started', onGameStarted);
+      network.off('join_success', onJoinSuccess);
+      network.off('join_failed', onJoinFailed);
+      network.off('join_status', onJoinStatus);
     };
   }, [network, onStartGame]);
 
@@ -72,12 +100,11 @@ export default function Lobby({ onStartGame }: Props) {
     }
 
     const name = playerName.trim() || 'Guest Player';
-    network.joinRoom(code, name);
-    setRoomCode(code);
-    setIsHost(false);
-    setPlayers(network.players);
-    setView('WAITING');
+    setIsConnecting(true);
+    setConnectStatusText('กำลังค้นหาและส่งสัญญาณเข้าห้อง...');
     setErrorMsg('');
+    setIsHost(false);
+    network.joinRoom(code, name);
   };
 
   // ─── 3. Host กดเริ่มเกม (Start Game) ──────────────────────────────────────
@@ -113,10 +140,12 @@ export default function Lobby({ onStartGame }: Props) {
   // ─── 6. ออกจากห้อง ────────────────────────────────────────────────────────
   const handleLeaveRoom = () => {
     network.leaveRoom();
+    setIsConnecting(false);
     setView('MAIN');
     setRoomCode('');
     setPlayers([]);
     setIsHost(false);
+    setErrorMsg('');
   };
 
   return (
@@ -262,15 +291,30 @@ export default function Lobby({ onStartGame }: Props) {
             <div className="space-y-2.5 sm:space-y-3">
               <button
                 type="button"
+                disabled={isConnecting}
                 onClick={handleJoinRoom}
-                className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:brightness-110 active:scale-98 transition-all rounded-2xl py-3 sm:py-3.5 text-white font-display text-lg sm:text-xl font-bold shadow-lg shadow-violet-600/25 flex items-center justify-center gap-2 cursor-pointer min-h-[48px]"
+                className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:brightness-110 active:scale-98 transition-all rounded-2xl py-3 sm:py-3.5 text-white font-display text-lg sm:text-xl font-bold shadow-lg shadow-violet-600/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 min-h-[48px]"
               >
-                เข้าห้องทันที (Join Room)
+                {isConnecting ? (
+                  <>
+                    <span className="animate-spin text-xl">⏳</span>
+                    <span className="text-base sm:text-lg">{connectStatusText || 'กำลังค้นหาห้อง...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🔑</span> เข้าห้องทันที (Join Room)
+                  </>
+                )}
               </button>
 
               <button
                 type="button"
-                onClick={() => setView('MAIN')}
+                disabled={isConnecting}
+                onClick={() => {
+                  setErrorMsg('');
+                  setIsConnecting(false);
+                  setView('MAIN');
+                }}
                 className="w-full bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl py-2.5 sm:py-3 text-white/70 font-medium text-xs sm:text-sm transition-all cursor-pointer min-h-[44px]"
               >
                 ◀ ย้อนกลับ (Back)
@@ -357,13 +401,20 @@ export default function Lobby({ onStartGame }: Props) {
                 </p>
               </div>
             ) : (
-              <div className="text-center py-4 bg-white/5 rounded-2xl border border-white/10">
-                <div className="animate-spin text-2xl mb-2">⏳</div>
-                <div className="text-white font-medium text-sm">
-                  กำลังรอให้หัวหน้าห้อง ({players.find((p) => p.isHost)?.name || 'Host'}) กดเริ่มเกม...
+              <div className="text-center py-4 bg-emerald-500/10 rounded-2xl border border-emerald-500/30">
+                <div className="text-2xl mb-1">🟢</div>
+                <div className="text-emerald-300 font-display text-base font-bold">
+                  เชื่อมต่อห้องสำเร็จแล้ว!
                 </div>
-                <div className="text-white/40 text-xs mt-1">
-                  กรุณารอสักครู่ เกมจะเริ่มขึ้นพร้อมกันทันที
+                <div className="text-white/80 text-xs mt-1">
+                  หัวหน้าห้อง: <span className="text-yellow-300 font-semibold">{players.find((p) => p.isHost)?.name || 'Host'}</span>
+                </div>
+                <div className="text-yellow-300 font-display text-sm mt-3 flex items-center justify-center gap-2">
+                  <span className="animate-spin text-base">⏳</span>
+                  <span>กำลังรอให้หัวหน้าห้องกดเริ่มเกม...</span>
+                </div>
+                <div className="text-white/40 text-[11px] mt-1">
+                  * เมื่อหัวหน้าห้องกดปุ่ม START GAME หน้าจอจะเข้าสู่เกม 3D ทันที
                 </div>
               </div>
             )}

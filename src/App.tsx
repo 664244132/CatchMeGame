@@ -3,6 +3,7 @@ import { GamePhase } from './game/types';
 import type { GameStateSnapshot, PlayerData, PlayerConfig } from './game/types';
 import type { GameEngine } from './game/GameEngine';
 import { NetworkManager } from './game/networkManager';
+import { BOMB_START_TIME } from './game/constants';
 import GameCanvas from './components/GameCanvas';
 import HUD from './components/HUD';
 import Lobby from './components/Lobby';
@@ -11,7 +12,7 @@ import MatchSummary from './components/MatchSummary';
 
 const INITIAL_STATE: GameStateSnapshot = {
   players: [],
-  bombTimer: 4,
+  bombTimer: BOMB_START_TIME,
   bombHolderId: 0,
   message: '',
   roundActive: false,

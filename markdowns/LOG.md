@@ -16,10 +16,28 @@
 | **06** | พัฒนาระบบ Responsive เต็มรูปแบบสำหรับสมาร์ทโฟนและแท็บเล็ต (Virtual Joystick 8 ทิศทาง, ปุ่มสัมผัส Dash/Jump) | สำเร็จ |
 | **07** | Refactor โค้ดตามกฎเหล็ก 15 ข้อใน `REFACTORCODE.md` (Zero-GC Particles, Discriminated Union Types, Guard Clauses) | สำเร็จ |
 | **08** | ปรับปรุงคู่มือเอกสารทั้งหมดใน `markdowns/` ให้ตรงกับโครงสร้างจริง 100% (AboutProject, DEBUG, PROJECT, GameDetails, USE_CASE) | สำเร็จ |
+| **09** | ปรับเวลาระเบิดเป็น 15 วินาที และแก้ไขระบบเข้าร่วมห้อง (Handshake ACK, Room Registry Fallback, Auto-Retry) ป้องกันการหมุนค้าง | สำเร็จ |
 
 ---
 
 ## 🚀 ประวัติการปรับปรุงรอบปัจจุบัน (Current Active Session)
+
+### 🔹 การแก้ไขระบบ Join ห้อง และปรับเวลาระเบิด 15 วินาที
+- **[src/game/constants.ts](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/game/constants.ts):**
+  - ปรับค่า `BOMB_START_TIME = 15.0;`
+- **[src/components/HUD.tsx](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/components/HUD.tsx):**
+  - นำเข้า `BOMB_START_TIME` แทนการหารค่า 4 และปรับระดับเตือนวิกฤต `timerUrgent = bombTimer < 3.5;`
+- **[src/App.tsx](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/App.tsx):**
+  - เชื่อมโยง `INITIAL_STATE.bombTimer = BOMB_START_TIME;`
+- **[src/game/types.ts](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/game/types.ts):**
+  - เพิ่ม `clientToken` ใน `LobbyPlayer`, เพิ่ม Interface `JoinRoomAckPayload`, `RoomRegistryItem` และอัปเดต Discriminated Unions
+- **[src/game/networkManager.ts](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/game/networkManager.ts):**
+  - พัฒนาระบบ Handshake พร้อม ACK (`JOIN_ROOM_ACK`) และระบบ Auto-Retry 4 ครั้ง
+  - ติดตั้ง LocalStorage Room Registry (`catchme_room_reg_`) พร้อม Heartbeat เพื่อให้แท็บ Guest สามารถค้นหาและตรวจสอบห้องจริงได้ทันที
+  - เพิ่ม Event `join_success`, `join_failed`, `join_status` ป้องกันการเกิด Infinite Loading Loop
+- **[src/components/Lobby.tsx](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/components/Lobby.tsx):**
+  - ปรับปรุง UI หน้า `JOIN` ให้แสดงสถานะกำลังเชื่อมต่อบนปุ่มกด และแสดงข้อความเตือนเมื่อไม่พบห้อง
+  - ปรับปรุงหน้า `WAITING` ให้แสดงสถานะเชื่อมต่อสำเร็จ 🟢 พร้อมชื่อ Host และคำอธิบายที่ชัดเจน
 
 ### 🔹 Step 3: อัพเดตคลังเอกสารใน `markdowns/` ให้ตรงกับโครงสร้างปัจจุบัน 100%
 - **[markdowns/AboutProject.md](file:///C:/Users/k2pwm/Downloads/CatchMeGame/markdowns/AboutProject.md):**

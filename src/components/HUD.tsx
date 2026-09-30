@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { GameStateSnapshot } from '../game/types';
+import { BOMB_START_TIME } from '../game/constants';
 import VirtualJoystick from './VirtualJoystick';
 
 interface Props {
@@ -26,9 +27,9 @@ export default function HUD({ state, round, totalRounds }: Props) {
   const human = players.find((p) => p.isHuman);
   const humanIsIt = human?.isCat && !human.isDead;
 
-  // คำนวณเปอร์เซ็นต์เวลาระเบิด (BOMB_START_TIME = 4.0 วินาที)
-  const timerPct = Math.max(0, bombTimer / 4);
-  const timerUrgent = bombTimer < 1.3;
+  // คำนวณเปอร์เซ็นต์เวลาระเบิด (อ้างอิงจาก BOMB_START_TIME = 15.0 วินาที)
+  const timerPct = Math.max(0, bombTimer / BOMB_START_TIME);
+  const timerUrgent = bombTimer < 3.5;
   const dashPct = Math.max(0, 1 - dashCooldown / 2);
 
   return (

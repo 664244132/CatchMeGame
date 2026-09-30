@@ -23,6 +23,20 @@ export interface LobbyPlayer {
   name: string;
   isHost: boolean;
   color: number;
+  clientToken?: string;
+}
+
+/**
+ * ข้อมูลรายการห้องที่เปิดอยู่สำหรับค้นหาข้ามแท็บ (Room Registry Storage Item)
+ */
+export interface RoomRegistryItem {
+  code: string;
+  hostName: string;
+  hostId: number;
+  players: LobbyPlayer[];
+  status: 'WAITING' | 'PLAYING';
+  totalRounds: number;
+  updatedAt: number;
 }
 
 /**
@@ -148,23 +162,39 @@ export interface SyncedPlayerState {
 }
 
 export interface JoinRoomPayload {
+  player?: LobbyPlayer;
   name: string;
   requestedId?: number;
+  clientToken: string;
+}
+
+export interface JoinRoomAckPayload {
+  success: boolean;
+  message?: string;
+  clientToken: string;
+  assignedId: number;
+  players: LobbyPlayer[];
+  totalRounds?: number;
+  isGameRunning?: boolean;
 }
 
 export interface PlayerJoinedPayload {
-  player: LobbyPlayer;
+  player?: LobbyPlayer;
   players: LobbyPlayer[];
+  assignedId?: number;
+  clientToken?: string;
 }
 
 export interface PlayerLeftPayload {
   playerId: number;
-  players: LobbyPlayer[];
+  players?: LobbyPlayer[];
 }
 
 export interface StartGamePayload {
-  initialCatId: number;
   totalRounds: number;
+  catId: number;
+  playerConfigs: PlayerConfig[];
+  initialCatId?: number;
 }
 
 export interface PlayerInputPayload {
@@ -185,12 +215,15 @@ export interface RoundEndPayload {
 }
 
 export interface NextRoundPayload {
-  roundNumber: number;
-  initialCatId: number;
+  nextRound?: number;
+  roundNumber?: number;
+  catId?: number;
+  initialCatId?: number;
 }
 
 export interface MatchOverPayload {
-  results: PlayerData[];
+  players?: PlayerData[];
+  results?: PlayerData[];
 }
 
 export type ResetLobbyPayload = Record<string, never>;
@@ -200,6 +233,7 @@ export type ResetLobbyPayload = Record<string, never>;
  */
 export type NetworkMessage =
   | { type: 'JOIN_ROOM'; senderId: number; payload: JoinRoomPayload }
+  | { type: 'JOIN_ROOM_ACK'; senderId: number; payload: JoinRoomAckPayload }
   | { type: 'PLAYER_JOINED'; senderId: number; payload: PlayerJoinedPayload }
   | { type: 'PLAYER_LEFT'; senderId: number; payload: PlayerLeftPayload }
   | { type: 'START_GAME'; senderId: number; payload: StartGamePayload }

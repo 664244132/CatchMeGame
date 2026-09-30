@@ -16,7 +16,7 @@ export const PLAYER_RADIUS = 0.5;
 
 // ─── กลไกระเบิดและการแตะส่งระเบิด (Bomb & Tag Mechanics) ─────────────────────
 export const TAG_DISTANCE = 1.9;
-export const BOMB_START_TIME = 4.0; // เพิ่มเวลาเป็น 4 วิ เพื่อให้เหมาะกับสนามขนาดใหญ่ 90m
+export const BOMB_START_TIME = 15.0; // เวลานับถอยหลังระเบิด 15 วินาที
 
 // ─── แพลตฟอร์มสิ่งกีดขวาง 17 จุด (Platforms across 90x90m Arena) ─────────────
 export interface PlatformDef {
