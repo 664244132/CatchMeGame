@@ -135,6 +135,7 @@ export interface PlayerConfig {
 
 export type NetworkMessageType =
   | 'JOIN_ROOM'
+  | 'JOIN_ROOM_ACK'
   | 'PLAYER_JOINED'
   | 'PLAYER_LEFT'
   | 'START_GAME'

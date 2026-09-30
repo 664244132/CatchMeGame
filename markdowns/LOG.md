@@ -18,10 +18,26 @@
 | **08** | ปรับปรุงคู่มือเอกสารทั้งหมดใน `markdowns/` ให้ตรงกับโครงสร้างจริง 100% (AboutProject, DEBUG, PROJECT, GameDetails, USE_CASE) | สำเร็จ |
 | **09** | ปรับเวลาระเบิดเป็น 15 วินาที และแก้ไขระบบเข้าร่วมห้อง (Handshake ACK, Room Registry Fallback, Auto-Retry) ป้องกันการหมุนค้าง | สำเร็จ |
 | **10** | ปรับแต่ง Vite Build Config (`chunkSizeWarningLimit: 1000` และ Code Splitting `manualChunks` สำหรับ Three.js และ React) กำจัด Chunk Size Warning | สำเร็จ |
+| **11** | อัปเกรดระบบเชื่อมต่อห้องเป็น WebRTC P2P (PeerJS) เล่นข้ามอุปกรณ์ได้จริง (มือถือ ↔ คอมพิวเตอร์) โดยไม่ใช้ Database พร้อม Dual-Transport Fallback | สำเร็จ |
 
 ---
 
 ## 🚀 ประวัติการปรับปรุงรอบปัจจุบัน (Current Active Session)
+
+### 🔹 การพัฒนาระบบ Cross-Device WebRTC P2P (เล่นข้ามเครื่องจริง 100%)
+- **[package.json](file:///C:/Users/k2pwm/Downloads/CatchMeGame/package.json):**
+  - ติดตั้งไลบรารี `peerjs` เพื่อรองรับ WebRTC DataChannels P2P แบบ Serverless
+- **[vite.config.ts](file:///C:/Users/k2pwm/Downloads/CatchMeGame/vite.config.ts):**
+  - เพิ่ม `peerjs` เข้าสู่ `manualChunks` เพื่อประสิทธิภาพ Code Splitting และ Caching
+- **[src/game/networkManager.ts](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/game/networkManager.ts):**
+  - ติดตั้ง WebRTC PeerJS เชื่อมต่อสัญญาณ P2P ด้วยรหัสห้อง 4 หลัก (`catchme3d_${code}`)
+  - รองรับ STUN Servers (Google & Twilio) สำหรับข้าม NAT/Firewall บนเครือข่าย WiFi/Cellular
+  - สร้างฟังก์ชัน `normalizeRoomCode()` ตัดอักขระพิเศษ/คำนำหน้า `CAT-` เพื่อให้พิมพ์รหัสง่ายและถูกต้องเสมอ
+  - วางระบบ Dual-Transport ควบคู่กับ BroadcastChannel และ LocalStorage สำรอง
+- **[src/game/types.ts](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/game/types.ts):**
+  - เพิ่ม `'JOIN_ROOM_ACK'` ใน `NetworkMessageType`
+- **[src/components/Lobby.tsx](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/components/Lobby.tsx):**
+  - ปรับ UI ให้รองรับรหัสห้อง 4 หลัก และระบุข้อความชัดเจนว่าสามารถเปิดบนมือถือเพื่อเล่นกับคอมพิวเตอร์ได้ทันที
 
 ### 🔹 การแก้ไข Chunk Size Warning ใน Vite Build
 - **[vite.config.ts](file:///C:/Users/k2pwm/Downloads/CatchMeGame/vite.config.ts):**

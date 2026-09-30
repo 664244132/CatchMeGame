@@ -24,6 +24,9 @@ export default defineConfig(({ mode }) => {
               if (id.includes('three')) {
                 return 'three'
               }
+              if (id.includes('peerjs')) {
+                return 'peerjs'
+              }
               if (id.includes('react') || id.includes('react-dom')) {
                 return 'vendor-react'
               }

@@ -1,3 +1,4 @@
+import { Peer, type DataConnection } from 'peerjs';
 import { PLAYER_PALETTE } from './constants';
 import type {
   LobbyPlayer,
@@ -21,16 +22,44 @@ export type NetworkEventCallback<T = unknown> = (payload: T) => void;
 
 const ROOM_STORAGE_KEY_PREFIX = 'catchme_room_reg_';
 const ROOM_TIMEOUT_MS = 90000; // 90 วินาที หากไม่มี Heartbeat ถือว่าห้องปิดแล้ว
+const PEER_PREFIX = 'catchme3d_';
+
+const PEER_CONFIG = {
+  debug: 0,
+  config: {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:global.stun.twilio.com:3478' },
+    ],
+  },
+};
 
 /**
- * NetworkManager - ระบบจัดการเครือข่ายห้องและการสื่อสารแบบเรียลไทม์ (Real-Time Room Network)
+ * จัดรูปแบบรหัสห้องให้เป็นมาตรฐานสากล:
+ * - ตัดช่องว่างและขีด
+ * - แปลงเป็นตัวพิมพ์ใหญ่
+ * - รองรับกรณีพิมพ์ CAT- หรือ ROOM นำหน้า
+ * เช่น 'cat-a8f2' -> 'A8F2', 'A 8 F 2' -> 'A8F2'
+ */
+export function normalizeRoomCode(code: string): string {
+  if (!code) return '';
+  return code
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .replace(/^(CAT|ROOM)/, '');
+}
+
+/**
+ * NetworkManager - ระบบจัดการเครือข่ายห้องและการสื่อสารแบบเรียลไทม์ (Cross-Device WebRTC P2P)
  *
  * รองรับ:
- * 1. ระบบ Room Code: สร้างรหัสห้องสุ่ม 6 หลัก และเข้าร่วมห้องด้วยรหัส
+ * 1. WebRTC DataChannel (PeerJS): เล่นข้ามอุปกรณ์ได้จริง 100% (คอม ↔ มือถือ / คอม ↔ คอม ผ่าน WiFi หรือ Internet)
  * 2. Handshake ด้วย ACK: ป้องกันปัญหาสมัครเข้าห้องแล้วหมุนโหลดค้าง
- * 3. Room Registry (LocalStorage Fallback): เก็บสถานะห้องข้ามแท็บเบราว์เซอร์ เพื่อให้ตรวจสอบห้องที่มีอยู่จริงได้ทันที
- * 4. Host-Authoritative Architecture: หัวหน้าห้องเป็นผู้ควบคุมการเริ่มเกมและซิงค์ข้อมูล
- * 5. Zero-Server / Serverless Transport: ใช้ BroadcastChannel ร่วมกับ LocalStorage
+ * 3. Dual-Transport Fallback: มี BroadcastChannel & LocalStorage รองรับการทดสอบ 2 แท็บบนเครื่องเดียวกัน
+ * 4. Host-Authoritative Architecture: หัวหน้าห้องเป็นผู้ควบคุมการเริ่มเกมและซิงค์ฟิสิกส์ 3D
+ * 5. Zero-Server / No Database (Rule 10 & 14): ไม่ใช้ฐานข้อมูล ข้อมูลเกมวิ่งตรง P2P
  */
 export class NetworkManager {
   private static instance: NetworkManager | null = null;
@@ -43,10 +72,16 @@ export class NetworkManager {
   public currentTotalRounds = 5;
   public isGameRunning = false;
 
+  // WebRTC P2P (PeerJS)
+  private peer: Peer | null = null;
+  private peerConnections: Map<string, DataConnection> = new Map(); // clientToken -> DataConnection (ฝั่ง Host)
+  private hostConnection: DataConnection | null = null; // DataConnection ไปยัง Host (ฝั่ง Guest)
+
+  // Local BroadcastChannel (สำหรับเล่น 2 แท็บบนเบราว์เซอร์เดียวกัน)
   private channel: BroadcastChannel | null = null;
   private listeners: Map<string, Set<NetworkEventCallback<any>>> = new Map();
 
-  // ตัวจัดการเวลา (Timers) ป้องกันการหมุนค้างและจัดการ Heartbeat
+  // ตัวจัดการเวลา (Timers) และการเชื่อมต่อ
   private heartbeatInterval: number | null = null;
   private joinRetryTimeout: number | null = null;
   private joinAttempts = 0;
@@ -64,12 +99,22 @@ export class NetworkManager {
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 1. ระบบ LocalStorage Room Registry (ตรวจสอบและค้นหาห้องข้ามแท็บ)
+  // 1. ระบบ Room Code & การจัดการพื้นที่เก็บข้อมูลเฉพาะเครื่อง (Local Fallback)
   // ──────────────────────────────────────────────────────────────────────────
 
   /**
-   * ดักฟังการเปลี่ยนแปลงของ LocalStorage เมื่อแท็บ Host อัปเดตสถานะห้อง
+   * สุ่มสร้างรหัสห้อง 4 หลักที่จดจำและพิมพ์ง่าย (เช่น 'A8F2')
+   * ละเว้นตัวอักษรที่สับสนง่าย เช่น 0, O, 1, I
    */
+  public generateRoomCode(): string {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 4; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  }
+
   private setupStorageListener() {
     if (typeof window === 'undefined') return;
 
@@ -87,7 +132,6 @@ export class NetworkManager {
       }
     });
 
-    // ล้างห้องเมื่อปิดหน้าต่างเบราว์เซอร์
     window.addEventListener('beforeunload', () => {
       if (this.isHost && this.roomCode) {
         this.removeRoomFromStorage(this.roomCode);
@@ -95,19 +139,14 @@ export class NetworkManager {
     });
   }
 
-  /**
-   * จัดการอัปเดตเมื่อได้รับข้อมูลห้องจาก LocalStorage
-   */
   private handleStorageRoomUpdate(roomData: RoomRegistryItem) {
     if (this.isHost) return;
 
-    // อัปเดตรายชื่อผู้เล่นจาก Storage หากมีข้อมูลใหม่
     if (Array.isArray(roomData.players) && roomData.players.length > 0) {
       this.players = roomData.players;
       this.emit('lobby_updated', [...this.players]);
     }
 
-    // หาก Host กดเริ่มเกมใน Storage และเครื่องนี้ยังไม่เริ่ม ให้เริ่มเกมตาม
     if (roomData.status === 'PLAYING' && !this.isGameRunning) {
       this.isGameRunning = true;
       const playerConfigs: PlayerConfig[] = this.players.map((p) => ({
@@ -125,9 +164,6 @@ export class NetworkManager {
     }
   }
 
-  /**
-   * บันทึกข้อมูลห้องลงใน LocalStorage
-   */
   public saveRoomToStorage(room: RoomRegistryItem): void {
     if (typeof window === 'undefined') return;
     try {
@@ -137,17 +173,12 @@ export class NetworkManager {
     }
   }
 
-  /**
-   * ดึงข้อมูลห้องจาก LocalStorage
-   */
   public getRoomFromStorage(code: string): RoomRegistryItem | null {
     if (typeof window === 'undefined') return null;
     try {
       const raw = localStorage.getItem(`${ROOM_STORAGE_KEY_PREFIX}${code.toUpperCase()}`);
       if (!raw) return null;
       const parsed = JSON.parse(raw) as RoomRegistryItem;
-
-      // ตรวจสอบว่าห้องยังไม่หมดอายุ (Heartbeat ไม่เกิน 90 วิ)
       if (Date.now() - parsed.updatedAt > ROOM_TIMEOUT_MS) {
         this.removeRoomFromStorage(code);
         return null;
@@ -158,9 +189,6 @@ export class NetworkManager {
     }
   }
 
-  /**
-   * ลบข้อมูลห้องออกจาก LocalStorage
-   */
   public removeRoomFromStorage(code: string): void {
     if (typeof window === 'undefined') return;
     try {
@@ -170,9 +198,6 @@ export class NetworkManager {
     }
   }
 
-  /**
-   * อัปเดตข้อมูลห้องในฐานะ Host
-   */
   private updateHostRoomStorage(status: 'WAITING' | 'PLAYING' = 'WAITING'): void {
     if (!this.isHost || !this.roomCode || !this.localPlayer) return;
 
@@ -189,23 +214,12 @@ export class NetworkManager {
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 2. การสร้างและเข้าร่วมห้อง (Room Creation & Joining)
+  // 2. การสร้างห้อง (Create Room as Host)
   // ──────────────────────────────────────────────────────────────────────────
 
   /**
-   * สุ่มสร้างรหัสห้องใหม่ 6 ตัวอักษร เช่น 'CAT-784'
-   */
-  public generateRoomCode(): string {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code = 'CAT-';
-    for (let i = 0; i < 3; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
-  }
-
-  /**
    * สร้างห้องใหม่ในฐานะ Host
+   * เปิดทั้ง WebRTC P2P Listener และ Local Channel
    */
   public createRoom(hostName = 'Host Player', rounds = 5): string {
     this.leaveRoom();
@@ -226,10 +240,30 @@ export class NetworkManager {
     };
     this.players = [this.localPlayer];
 
+    // 1. เริ่มต้น WebRTC Host Peer (ใช้รหัสห้องเป็น Peer ID สากล)
+    const hostPeerId = `${PEER_PREFIX}${code}`;
+    try {
+      this.peer = new Peer(hostPeerId, PEER_CONFIG);
+
+      this.peer.on('open', (id) => {
+        console.log(`[WebRTC] Host peer opened successfully with ID: ${id}`);
+      });
+
+      this.peer.on('connection', (conn) => {
+        this.handleIncomingPeerConnection(conn);
+      });
+
+      this.peer.on('error', (err: any) => {
+        console.warn('[WebRTC] Host peer warning/error:', err);
+      });
+    } catch (err) {
+      console.error('[WebRTC] Failed to initialize host peer:', err);
+    }
+
+    // 2. เริ่มต้น BroadcastChannel & Storage สำรองสำหรับเล่นบนเครื่องเดียวกัน
     this.initChannel(code);
     this.updateHostRoomStorage('WAITING');
 
-    // ส่งสัญญาณ Heartbeat ทุกๆ 2.5 วินาที เพื่อรักษาห้องให้คงอยู่
     this.heartbeatInterval = window.setInterval(() => {
       this.updateHostRoomStorage(this.isGameRunning ? 'PLAYING' : 'WAITING');
     }, 2500);
@@ -238,13 +272,67 @@ export class NetworkManager {
   }
 
   /**
-   * เข้าร่วมห้องที่มีอยู่แล้วด้วยรหัสห้อง (Room Code)
-   * มีระบบ Handshake + ACK + Auto-retry ป้องกันการหมุนโหลดค้าง
+   * จัดการการเชื่อมต่อ WebRTC ขาเข้าจาก Guest (มือถือหรือเครื่องอื่น)
+   */
+  private handleIncomingPeerConnection(conn: DataConnection) {
+    conn.on('open', () => {
+      console.log('[WebRTC] Guest peer connection opened:', conn.peer);
+    });
+
+    conn.on('data', (data: unknown) => {
+      const msg = data as NetworkMessage;
+      if (!msg || !msg.type) return;
+
+      // จดจำ Connection ของผู้เล่นตาม ClientToken
+      if (msg.type === 'JOIN_ROOM') {
+        const payload = msg.payload as JoinRoomPayload;
+        if (payload?.clientToken) {
+          this.peerConnections.set(payload.clientToken, conn);
+        }
+      }
+
+      this.handleHostMessage(msg);
+    });
+
+    conn.on('close', () => {
+      for (const [token, c] of this.peerConnections.entries()) {
+        if (c === conn) {
+          this.peerConnections.delete(token);
+          const p = this.players.find((pl) => pl.clientToken === token);
+          if (p) {
+            this.handleHostMessage({
+              type: 'PLAYER_LEFT',
+              senderId: p.id,
+              payload: { playerId: p.id },
+            });
+          }
+          break;
+        }
+      }
+    });
+
+    conn.on('error', (err) => {
+      console.warn('[WebRTC] DataConnection error:', err);
+    });
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 3. การเข้าร่วมห้อง (Join Room as Guest - Cross Device P2P)
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /**
+   * เข้าร่วมห้องด้วยรหัสห้อง
+   * รองรับการเชื่อมต่อข้ามเครื่องผ่าน WebRTC (มือถือ ↔ คอมพิวเตอร์) และ Local Fallback
    */
   public joinRoom(code: string, playerName = 'Guest Player'): void {
     this.leaveRoom();
 
-    const normalizedCode = code.trim().toUpperCase();
+    const normalizedCode = normalizeRoomCode(code);
+    if (!normalizedCode) {
+      this.emit('join_failed', { reason: 'กรุณากรอกรหัสห้องให้ถูกต้อง' });
+      return;
+    }
+
     this.roomCode = normalizedCode;
     this.isHost = false;
     this.isGameRunning = false;
@@ -252,18 +340,6 @@ export class NetworkManager {
     this.joinAttempts = 0;
     this.clientToken = `guest_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
-    // ตรวจสอบห้องใน Storage ก่อนทันที
-    const existingRoom = this.getRoomFromStorage(normalizedCode);
-    if (!existingRoom) {
-      // หากใน Storage ยังไม่พบ ให้เปิด Channel ลองคุยกับ Host ดูก่อน (อาจเป็นต่าง Context)
-      console.log(`Room ${normalizedCode} not found in immediate storage, trying BroadcastChannel...`);
-    } else {
-      // หากพบข้อมูลห้องใน Storage ให้นำรายชื่อผู้เล่นเดิมมาแสดงล่วงหน้า
-      this.players = existingRoom.players;
-      this.currentTotalRounds = existingRoom.totalRounds;
-    }
-
-    // สร้างข้อมูลผู้เล่นชั่วคราว
     const tempId = Math.floor(Math.random() * 8999) + 1000;
     const colorIndex = (tempId % (PLAYER_PALETTE.length - 1)) + 1;
 
@@ -275,27 +351,103 @@ export class NetworkManager {
       clientToken: this.clientToken,
     };
 
-    // เชื่อมต่อ BroadcastChannel
+    // 1. เปิด BroadcastChannel สำหรับกรณีเล่นในเครื่องเดียวกัน
     this.initChannel(normalizedCode);
 
-    // เริ่มต้นกระบวนการส่งคำขอเข้าห้องพร้อมระบบ Retry
+    // 2. เริ่มต้นเชื่อมต่อสัญญาณ WebRTC ข้ามเครือข่าย
+    this.emit('join_status', {
+      status: 'CONNECTING',
+      attempt: 1,
+      message: 'กำลังเชื่อมต่อสัญญาณ P2P (WebRTC)...',
+    });
+
+    const hostPeerId = `${PEER_PREFIX}${normalizedCode}`;
+    const guestPeerId = `${PEER_PREFIX}${normalizedCode}_g_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+
+    try {
+      this.peer = new Peer(guestPeerId, PEER_CONFIG);
+
+      this.peer.on('open', () => {
+        this.emit('join_status', {
+          status: 'CONNECTING',
+          attempt: 1,
+          message: 'พบสัญญาณเน็ตเวิร์ก กำลังเชื่อมต่อไปยังหัวหน้าห้อง...',
+        });
+
+        const conn = this.peer!.connect(hostPeerId, { reliable: true });
+        this.hostConnection = conn;
+
+        conn.on('open', () => {
+          console.log('[WebRTC] Connected directly to host peer!');
+          this.emit('join_status', {
+            status: 'CONNECTING',
+            attempt: 1,
+            message: 'เชื่อมต่อโฮสต์สำเร็จ กำลังลงทะเบียนเข้าห้อง...',
+          });
+
+          // ส่งคำขอ JOIN_ROOM ผ่าน WebRTC DataChannel
+          const payload: JoinRoomPayload = {
+            player: this.localPlayer!,
+            name: this.localPlayer!.name,
+            requestedId: this.localPlayer!.id,
+            clientToken: this.clientToken,
+          };
+
+          const message: NetworkMessage = {
+            type: 'JOIN_ROOM',
+            senderId: this.localPlayer!.id,
+            payload,
+          };
+          conn.send(message);
+        });
+
+        conn.on('data', (data: unknown) => {
+          const msg = data as NetworkMessage;
+          if (msg && msg.type) {
+            this.handleClientMessage(msg);
+          }
+        });
+
+        conn.on('close', () => {
+          console.log('[WebRTC] Disconnected from host');
+        });
+
+        conn.on('error', (err) => {
+          console.warn('[WebRTC] Host connection error:', err);
+        });
+      });
+
+      this.peer.on('error', (err: any) => {
+        console.warn('[WebRTC] Guest peer error:', err);
+        if (err.type === 'peer-unavailable') {
+          // หาก WebRTC ไม่พบโฮสต์ ให้ตรวจสอบ Local Storage ดูก่อน
+          setTimeout(() => {
+            if (this.isConnectedToHost) return;
+            const roomCheck = this.roomCode ? this.getRoomFromStorage(this.roomCode) : null;
+            if (!roomCheck) {
+              this.emit('join_failed', {
+                reason: `ไม่พบรหัสห้อง "${this.roomCode}" หรือหัวหน้าห้องปิดหน้าต่างไปแล้ว กรุณาตรวจสอบรหัสห้องอีกครั้ง`,
+              });
+            }
+          }, 800);
+        }
+      });
+    } catch (err) {
+      console.error('[WebRTC] Error initializing guest peer:', err);
+    }
+
+    // 3. เริ่มส่งคำขอผ่าน BroadcastChannel สำรองควบคู่ไปด้วย
     this.sendJoinRoomRequest();
   }
 
   /**
-   * ส่งคำขอเข้าห้อง (JOIN_ROOM) พร้อมระบบจับเวลา Timeout ป้องกันการหมุนค้าง
+   * ส่งคำขอเข้าห้องผ่านช่องทางสำรอง (BroadcastChannel / LocalStorage)
    */
   private sendJoinRoomRequest(): void {
     if (!this.localPlayer || !this.roomCode || this.isConnectedToHost) return;
 
     this.joinAttempts++;
-    this.emit('join_status', {
-      status: 'CONNECTING',
-      attempt: this.joinAttempts,
-      message: 'กำลังติดต่อหัวหน้าห้อง...',
-    });
 
-    // ส่งข้อความ JOIN_ROOM ไปยัง Host
     const payload: JoinRoomPayload = {
       player: this.localPlayer,
       name: this.localPlayer.name,
@@ -304,17 +456,15 @@ export class NetworkManager {
     };
     this.sendMessage('JOIN_ROOM', payload);
 
-    // ตั้งเวลา 1.2 วินาที หากยังไม่ได้รับการตอบกลับ (ACK) ให้ลองส่งซ้ำ
     this.joinRetryTimeout = window.setTimeout(() => {
       if (this.isConnectedToHost) return;
 
       if (this.joinAttempts < 4) {
         this.sendJoinRoomRequest();
       } else {
-        // หากลองครบ 4 ครั้ง (~5 วินาที) แล้วยังไม่มีการตอบกลับ
+        // หากส่งครบ 4 ครั้งและยังไม่ได้รับการตอบกลับ
         const roomCheck = this.roomCode ? this.getRoomFromStorage(this.roomCode) : null;
         if (roomCheck) {
-          // หากพบห้องใน Storage แต่อาจติดขัด Broadcast ให้ดึงข้อมูลมาเชื่อมต่อตรง
           this.isConnectedToHost = true;
           this.players = roomCheck.players;
           this.emit('join_success', {
@@ -322,18 +472,17 @@ export class NetworkManager {
             roomCode: this.roomCode,
           });
           this.emit('lobby_updated', [...this.players]);
-        } else {
-          // แจ้งเตือนข้อผิดพลาด ไม่ปล่อยให้หมุนค้าง
+        } else if (!this.hostConnection?.open) {
           this.emit('join_failed', {
             reason: `ไม่พบรหัสห้อง "${this.roomCode}" หรือหัวหน้าห้องปิดหน้าต่างไปแล้ว กรุณาตรวจสอบรหัสห้องอีกครั้ง`,
           });
         }
       }
-    }, 1200);
+    }, 1500);
   }
 
   /**
-   * ออกจากห้องปัจจุบันและคืนทรัพยากร
+   * ออกจากห้องและคืนทรัพยากรทั้งหมด (ทั้ง WebRTC และ Broadcast)
    */
   public leaveRoom(): void {
     if (this.joinRetryTimeout) {
@@ -354,6 +503,22 @@ export class NetworkManager {
       this.sendMessage('PLAYER_LEFT', { playerId: this.localPlayer.id });
     }
 
+    // ปิดการเชื่อมต่อ WebRTC
+    if (this.hostConnection) {
+      this.hostConnection.close();
+      this.hostConnection = null;
+    }
+    for (const conn of this.peerConnections.values()) {
+      conn.close();
+    }
+    this.peerConnections.clear();
+
+    if (this.peer) {
+      this.peer.destroy();
+      this.peer = null;
+    }
+
+    // ปิด BroadcastChannel
     if (this.channel) {
       this.channel.close();
       this.channel = null;
@@ -369,7 +534,7 @@ export class NetworkManager {
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 3. การรับส่งข้อความผ่านแชนเนล (Channel Communication)
+  // 4. การรับส่งข้อความผ่านเครือข่าย (Unified Messaging: WebRTC + Broadcast)
   // ──────────────────────────────────────────────────────────────────────────
 
   private initChannel(code: string) {
@@ -387,19 +552,44 @@ export class NetworkManager {
     };
   }
 
+  /**
+   * ส่งข้อความเครือข่ายไปยังผู้เล่นอื่น (ส่งทั้งผ่าน WebRTC DataChannel และ BroadcastChannel)
+   */
   public sendMessage(type: NetworkMessageType, payload: unknown): void {
-    if (!this.channel || !this.localPlayer) return;
+    if (!this.localPlayer) return;
 
-    const message = {
+    const message: NetworkMessage = {
       type,
       senderId: this.localPlayer.id,
       payload,
     } as NetworkMessage;
 
-    try {
-      this.channel.postMessage(message);
-    } catch (e) {
-      console.error('Failed to postMessage:', e);
+    // 1. ส่งผ่าน WebRTC DataChannel
+    if (this.isHost) {
+      for (const conn of this.peerConnections.values()) {
+        if (conn.open) {
+          try {
+            conn.send(message);
+          } catch (e) {
+            console.warn('[WebRTC] Failed to send message to guest peer:', e);
+          }
+        }
+      }
+    } else if (this.hostConnection && this.hostConnection.open) {
+      try {
+        this.hostConnection.send(message);
+      } catch (e) {
+        console.warn('[WebRTC] Failed to send message to host peer:', e);
+      }
+    }
+
+    // 2. ส่งผ่าน BroadcastChannel สำหรับเครื่องเดียวกัน
+    if (this.channel) {
+      try {
+        this.channel.postMessage(message);
+      } catch (e) {
+        // ignore
+      }
     }
   }
 
@@ -412,27 +602,26 @@ export class NetworkManager {
   }
 
   /**
-   * ตรรกะจัดการข้อความเน็ตเวิร์กบนเครื่อง Host
+   * ตรรกะจัดการข้อความบนเครื่อง Host
    */
   private handleHostMessage(msg: NetworkMessage) {
-    // 1. ผู้เล่นใหม่ขอเข้าร่วมห้อง (JOIN_ROOM)
+    // 1. ผู้เล่นขอเข้าร่วมห้อง (JOIN_ROOM)
     if (msg.type === 'JOIN_ROOM') {
       const payload = msg.payload as JoinRoomPayload;
       if (!payload || !payload.clientToken) return;
 
-      // ตรวจสอบความจุห้องสูงสุด 50 คน
       if (this.players.length >= 50) {
-        this.sendMessage('JOIN_ROOM_ACK', {
+        const ackPayload: JoinRoomAckPayload = {
           success: false,
           message: 'ห้องเต็มแล้ว (สูงสุด 50 คน)',
           clientToken: payload.clientToken,
           assignedId: -1,
           players: this.players,
-        } as JoinRoomAckPayload);
+        };
+        this.sendDirectAck(payload.clientToken, ackPayload);
         return;
       }
 
-      // ตรวจสอบว่าผู้เล่นนี้เคยลงทะเบียนไว้หรือยัง (ป้องกันการส่งซ้ำจาก Retry)
       let targetPlayer = this.players.find((p) => p.clientToken === payload.clientToken);
 
       if (!targetPlayer) {
@@ -453,17 +642,19 @@ export class NetworkManager {
         this.emit('lobby_updated', [...this.players]);
       }
 
-      // ส่งข้อความยืนยัน (ACK) ให้ Guest ทราบทันที
-      this.sendMessage('JOIN_ROOM_ACK', {
+      const ackPayload: JoinRoomAckPayload = {
         success: true,
         clientToken: payload.clientToken,
         assignedId: targetPlayer.id,
         players: this.players,
         totalRounds: this.currentTotalRounds,
         isGameRunning: this.isGameRunning,
-      } as JoinRoomAckPayload);
+      };
 
-      // กระจายรายชื่อผู้เล่นทั้งหมดให้ทุกคนในห้องอัปเดต
+      // ส่ง ACK ยืนยันให้ผู้เล่นคนนั้น
+      this.sendDirectAck(payload.clientToken, ackPayload);
+
+      // กระจายรายชื่อผู้เล่นทั้งหมดให้ทุกคนในห้องทราบ
       this.sendMessage('PLAYER_JOINED', {
         player: targetPlayer,
         players: this.players,
@@ -493,7 +684,28 @@ export class NetworkManager {
   }
 
   /**
-   * ตรรกะจัดการข้อความเน็ตเวิร์กบนเครื่อง Client
+   * ส่ง ACK ตรงไปยังผู้เล่นคนนั้นโดยเฉพาะ
+   */
+  private sendDirectAck(clientToken: string, payload: JoinRoomAckPayload) {
+    const conn = this.peerConnections.get(clientToken);
+    if (conn && conn.open) {
+      try {
+        conn.send({
+          type: 'JOIN_ROOM_ACK',
+          senderId: this.localPlayer?.id ?? 0,
+          payload,
+        } as NetworkMessage);
+      } catch (e) {
+        console.warn('Failed to send direct WebRTC ACK:', e);
+      }
+    }
+
+    // ส่งผ่าน BroadcastChannel ด้วย
+    this.sendMessage('JOIN_ROOM_ACK', payload);
+  }
+
+  /**
+   * ตรรกะจัดการข้อความบนเครื่อง Client / Guest
    */
   private handleClientMessage(msg: NetworkMessage) {
     // 1. รับการตอบรับเข้าห้องจาก Host (JOIN_ROOM_ACK)
@@ -506,7 +718,6 @@ export class NetworkManager {
         return;
       }
 
-      // หยุดตัวนับเวลา Retry
       if (this.joinRetryTimeout) {
         clearTimeout(this.joinRetryTimeout);
         this.joinRetryTimeout = null;
@@ -545,7 +756,6 @@ export class NetworkManager {
 
       this.players = currentPlayers;
 
-      // หากเป็นตัวเราเองที่ได้รับ assignedId
       if (payload.clientToken === this.clientToken && this.localPlayer) {
         this.isConnectedToHost = true;
         if (payload.assignedId !== undefined) {
@@ -607,11 +817,11 @@ export class NetworkManager {
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 4. คำสั่งของ Host สำหรับควบคุมเกม (Host Commands)
+  // 5. คำสั่งของ Host สำหรับควบคุมเกม (Host Commands)
   // ──────────────────────────────────────────────────────────────────────────
 
   /**
-   * Host สั่งเริ่มเกม (ส่งรายชื่อผู้เล่น, จำนวนรอบ, และผู้ถือระเบิดคนแรก)
+   * Host สั่งเริ่มเกม
    */
   public hostStartGame(totalRounds: number): { catId: number; playerConfigs: PlayerConfig[] } {
     if (!this.isHost) throw new Error('Only the host can start the game!');
@@ -650,7 +860,7 @@ export class NetworkManager {
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 5. ระบบ Event Emitter (Subscription & Memory Leak Prevention)
+  // 6. ระบบ Event Emitter (Subscription & Memory Leak Prevention)
   // ──────────────────────────────────────────────────────────────────────────
 
   public on<T = any>(event: string, callback: NetworkEventCallback<T>): void {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { NetworkManager } from '../game/networkManager';
+import { NetworkManager, normalizeRoomCode } from '../game/networkManager';
 import type { LobbyPlayer, PlayerConfig } from '../game/types';
 
 interface Props {
@@ -93,15 +93,15 @@ export default function Lobby({ onStartGame }: Props) {
 
   // ─── 2. เข้าร่วมห้องด้วยรหัส (Join Room as Guest) ───────────────────────────
   const handleJoinRoom = () => {
-    const code = roomCodeInput.trim().toUpperCase();
+    const code = normalizeRoomCode(roomCodeInput);
     if (!code) {
-      setErrorMsg('กรุณากรอกรหัสห้อง (Room Code)');
+      setErrorMsg('กรุณากรอกรหัสห้อง (Room Code 4 หลัก เช่น A8F2)');
       return;
     }
 
     const name = playerName.trim() || 'Guest Player';
     setIsConnecting(true);
-    setConnectStatusText('กำลังค้นหาและส่งสัญญาณเข้าห้อง...');
+    setConnectStatusText('กำลังค้นหาและเชื่อมต่อสัญญาณกับโฮสต์...');
     setErrorMsg('');
     setIsHost(false);
     network.joinRoom(code, name);
@@ -270,16 +270,19 @@ export default function Lobby({ onStartGame }: Props) {
 
             <div className="mb-4">
               <label className="block text-white/70 text-xs uppercase tracking-wider mb-2 font-medium">
-                กรอกรหัสห้อง (Room Code):
+                กรอกรหัสห้อง 4 หลัก (Room Code):
               </label>
               <input
                 type="text"
                 value={roomCodeInput}
                 onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
-                placeholder="เช่น CAT-492"
-                maxLength={10}
-                className="w-full bg-black/50 border border-white/30 rounded-2xl px-4 py-3 sm:py-3.5 text-white font-display text-xl sm:text-2xl tracking-widest text-center uppercase focus:outline-none focus:border-violet-400 transition-all font-bold"
+                placeholder="เช่น A8F2"
+                maxLength={8}
+                className="w-full bg-black/50 border border-white/30 rounded-2xl px-4 py-3 sm:py-3.5 text-white font-display text-2xl sm:text-3xl tracking-widest text-center uppercase focus:outline-none focus:border-violet-400 transition-all font-bold"
               />
+              <p className="text-white/40 text-[11px] text-center mt-1.5">
+                🌐 เล่นข้ามเครื่องได้ (เช่น เปิดบนมือถือเพื่อเข้าห้องบนคอมพิวเตอร์)
+              </p>
             </div>
 
             {errorMsg && (
@@ -331,15 +334,18 @@ export default function Lobby({ onStartGame }: Props) {
             {/* กล่องแสดง Room Code ขนาดใหญ่ */}
             <div className="bg-black/40 border border-white/15 rounded-2xl p-3 sm:p-4 mb-4 sm:mb-5 text-center relative">
               <div className="text-white/50 text-[10px] sm:text-xs font-semibold uppercase tracking-widest mb-1">
-                Room Code ของคุณ
+                Room Code ของคุณ (เล่นข้ามเครื่องได้)
               </div>
-              <div className="font-display text-3xl sm:text-4xl text-yellow-300 tracking-wider">
+              <div className="font-display text-4xl sm:text-5xl text-yellow-300 tracking-widest font-black">
                 {roomCode}
               </div>
+              <p className="text-white/50 text-[11px] mt-1.5">
+                🌐 นำรหัสนี้ไปกรอกบนมือถือหรือเครื่องอื่นเพื่อเล่นด้วยกันได้ทันที
+              </p>
               <button
                 type="button"
                 onClick={handleCopyCode}
-                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white/80 text-xs transition-all cursor-pointer"
+                className="mt-2.5 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white/80 text-xs transition-all cursor-pointer"
               >
                 <span>📋</span> {copied ? 'คัดลอกเรียบร้อย!' : 'แตะเพื่อคัดลอกรหัส'}
               </button>
