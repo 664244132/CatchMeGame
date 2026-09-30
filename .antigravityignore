@@ -1,0 +1,95 @@
+# ==============================================================================
+# .antigravityignore - CatchMeGame
+# กำหนดไฟล์และโฟลเดอร์ที่ยกเว้นจากการ Index ของ AI Agent และการ Commit ที่ไม่จำเป็น
+# Excludes unnecessary files and directories from AI Agent indexing and Git commits.
+# ==============================================================================
+
+# ─── 1. Node & Package Dependencies ───────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.pnpm-store/
+
+# ─── 2. Production Build Outputs & Bundles ────────────────────────────────────
+dist/
+build/
+out/
+.next/
+.output/
+*.tsbuildinfo
+*.map
+*.bundle.*
+
+# ─── 3. Caches & Temporary Directories ───────────────────────────────────────
+.cache/
+.vite/
+.tmp/
+.tmp-*/
+.parcel-cache/
+scratch/
+temp/
+tmp/
+
+# ─── 4. Logs & Diagnostic Dumps ──────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log
+yarn-error.log
+*.pid
+*.seed
+*.pid.lock
+*.stackdump
+
+# ─── 5. Environment & Sensitive Credentials ──────────────────────────────────
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+*.env
+*.pem
+*.key
+*.cert
+*.crt
+
+# ─── 6. Operating System Artifacts ────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# ─── 7. IDE & Editor Configurations ──────────────────────────────────────────
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/tasks.json
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+.claude-replay.*
+
+# ─── 8. Workspace & Tooling Specific State ───────────────────────────────────
+.figma/design-context/
+.plugins/
+.opencode-skills/
+coverage/
+.nyc_output/
+
+# ─── 9. Backup, Patch & Diff Artifacts ───────────────────────────────────────
+*.bak
+*.orig
+*.patch
+*.diff
+*.rej

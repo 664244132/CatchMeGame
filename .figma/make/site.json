@@ -1,0 +1,10 @@
+{
+  "description": "Engage in a vibrant 3D multiplayer party game where players take turns as the Cat or Mice, using strategy and quick reflexes to survive the bomb pass challenge.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
