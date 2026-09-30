@@ -73,6 +73,7 @@ export interface GameStateSnapshot {
   message: string;
   roundActive: boolean;
   dashCooldown: number;
+  bombDistance?: number; // ระยะห่างจากคนถือระเบิด (เมตร) สำหรับแสดงผลบน HUD
 }
 
 /**
@@ -95,6 +96,8 @@ export interface PlayerEntity {
   body: PhysicsBody;
   mesh: THREE.Group;
   bombIndicator: THREE.Group;
+  outlineMesh: THREE.Group; // Outline / Silhouette แสดงทะลุกำแพงตามสีประจำตัวละคร
+  nameplate: THREE.Sprite; // ป้ายชื่อ 3D ลอยเหนือหัวผู้เล่น มองเห็นทะลุกำแพง
   dashTimer: number;
   dashCooldown: number;
   isDashing: boolean;

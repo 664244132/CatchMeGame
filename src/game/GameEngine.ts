@@ -31,6 +31,8 @@ import {
   createBombIndicator,
   createMushroom,
   createStarField,
+  createPlayerOutlineMesh,
+  createPlayerNameplate,
 } from './meshFactory';
 import { NetworkManager } from './networkManager';
 
@@ -261,6 +263,16 @@ export class GameEngine {
       const mesh = createMouseMesh(cfg.color);
       const bombIndicator = createBombIndicator();
       mesh.add(bombIndicator);
+
+      // สร้าง Outline & Silhouette ทะลุกำแพงตามสีประจำตัวละคร
+      const outlineMesh = createPlayerOutlineMesh(cfg.color);
+      mesh.add(outlineMesh);
+
+      // สร้างป้ายชื่อ 3D ลอยเหนือหัวผู้เล่น มองเห็นทะลุกำแพง
+      const isLocal = cfg.id === this.localPlayerId;
+      const nameplate = createPlayerNameplate(cfg.name, cfg.color, isLocal);
+      mesh.add(nameplate);
+
       mesh.position.copy(spawn);
       this.scene.add(mesh);
 
@@ -285,6 +297,8 @@ export class GameEngine {
         },
         mesh,
         bombIndicator,
+        outlineMesh,
+        nameplate,
         dashTimer: 0,
         dashCooldown: 0,
         isDashing: false,
@@ -353,6 +367,8 @@ export class GameEngine {
           p.data.bombsDeflected = sp.bombsDeflected;
           p.dashCooldown = sp.dashCooldown;
           p.mesh.visible = !sp.isDead;
+          p.outlineMesh.visible = !sp.isDead;
+          p.nameplate.visible = !sp.isDead;
           this.applyVisual(p);
           break;
         }
@@ -374,10 +390,20 @@ export class GameEngine {
   }
 
   /**
-   * กำหนด Local Player ID สำหรับเครื่องนี้
+   * กำหนด Local Player ID สำหรับเครื่องนี้ และปรับป้ายชื่อ (You) ให้ถูกต้อง
    */
   setLocalPlayerId(id: number) {
     this.localPlayerId = id;
+    for (let i = 0; i < this.players.length; i++) {
+      const p = this.players[i];
+      const isLocal = p.id === id;
+      p.mesh.remove(p.nameplate);
+      p.nameplate.material.map?.dispose();
+      p.nameplate.material.dispose();
+      p.nameplate = createPlayerNameplate(p.name, p.data.color, isLocal);
+      p.nameplate.visible = !p.data.isDead;
+      p.mesh.add(p.nameplate);
+    }
   }
 
   /**
@@ -400,6 +426,8 @@ export class GameEngine {
       p.body.isGrounded = false;
       p.mesh.position.copy(spawn);
       p.mesh.visible = true;
+      p.outlineMesh.visible = true;
+      p.nameplate.visible = true;
       p.dashCooldown = 0;
       p.isDashing = false;
 
@@ -430,6 +458,27 @@ export class GameEngine {
     this.network.off('remote_input', this.handleRemoteInput);
     this.network.off('sync_state', this.handleSyncState);
 
+    // กำจัดทรัพยากร Mesh, Outline และ Nameplate ของผู้เล่นทุกคน
+    for (let i = 0; i < this.players.length; i++) {
+      const p = this.players[i];
+      if (p.outlineMesh) {
+        p.outlineMesh.traverse((obj) => {
+          if (obj instanceof THREE.Mesh) {
+            obj.geometry?.dispose();
+            if (Array.isArray(obj.material)) {
+              obj.material.forEach((m) => m.dispose());
+            } else {
+              obj.material?.dispose();
+            }
+          }
+        });
+      }
+      if (p.nameplate) {
+        p.nameplate.material.map?.dispose();
+        p.nameplate.material.dispose();
+      }
+    }
+
     // กำจัดละอองอนุภาคระเบิดที่ยังค้างอยู่ใน Scene
     for (let i = 0; i < this.explosions.length; i++) {
       const ex = this.explosions[i];
@@ -457,10 +506,15 @@ export class GameEngine {
    */
   private applyVisual(p: PlayerEntity) {
     const isCat = p.data.isCat;
+    const isDead = p.data.isDead;
     const emissive = isCat ? 0xff4400 : 0x000000;
     const intensity = isCat ? 0.5 : 0;
 
     p.mesh.traverse((obj) => {
+      // ข้าม outlineMesh, nameplate และลูกๆ ของมัน ไม่ให้ถูกเซ็ต emissive สีส้มทับสีประจำตัว
+      if (obj === p.outlineMesh || obj === p.nameplate) return;
+      if (p.outlineMesh && (obj.parent === p.outlineMesh || obj.name.startsWith('outline_'))) return;
+
       if (obj instanceof THREE.Mesh) {
         const mat = obj.material;
         if (mat instanceof THREE.MeshLambertMaterial || mat instanceof THREE.MeshStandardMaterial) {
@@ -470,7 +524,9 @@ export class GameEngine {
       }
     });
 
-    p.bombIndicator.visible = isCat;
+    p.bombIndicator.visible = isCat && !isDead;
+    p.outlineMesh.visible = !isDead;
+    p.nameplate.visible = !isDead;
   }
 
   private bindInput() {
@@ -816,6 +872,8 @@ export class GameEngine {
     cat.data.isCat = false;
     cat.mesh.visible = false;
     cat.bombIndicator.visible = false;
+    cat.outlineMesh.visible = false;
+    cat.nameplate.visible = false;
 
     this.currentMessage = `💀 ${cat.name} EXPLODED!`;
     this.messageTimer = 3;
@@ -936,11 +994,22 @@ export class GameEngine {
 
   private emitState() {
     let localPlayer: PlayerEntity | null = null;
+    let bombHolder: PlayerEntity | null = null;
+
     for (let i = 0; i < this.players.length; i++) {
-      if (this.players[i].id === this.localPlayerId) {
-        localPlayer = this.players[i];
-        break;
+      const p = this.players[i];
+      if (p.id === this.localPlayerId) {
+        localPlayer = p;
       }
+      if (p.id === this.bombHolderId && !p.data.isDead) {
+        bombHolder = p;
+      }
+    }
+
+    // คำนวณระยะห่างระหว่างเรากับผู้ถือระเบิด (Zero-GC distance calculation)
+    let bombDistance: number | undefined = undefined;
+    if (localPlayer && bombHolder && localPlayer.id !== bombHolder.id && !localPlayer.data.isDead) {
+      bombDistance = localPlayer.body.position.distanceTo(bombHolder.body.position);
     }
 
     if (this.isHost && this.network.roomCode) {
@@ -971,6 +1040,7 @@ export class GameEngine {
       message: this.currentMessage,
       roundActive: this.roundActive,
       dashCooldown: localPlayer?.dashCooldown ?? 0,
+      bombDistance,
     });
   }
 }

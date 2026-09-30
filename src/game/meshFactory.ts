@@ -191,6 +191,9 @@ export function createBombIndicator(): THREE.Group {
   light.position.y = 2.4;
   group.add(light);
 
+  // เพิ่มเสาแสงนีออน Sky Beacon พุ่งขึ้นฟ้าช่วยระบุตำแหน่งคนถือระเบิดได้ทั่วสนาม
+  group.add(createSkyBeacon());
+
   group.visible = false;
   return group;
 }
@@ -245,4 +248,145 @@ export function createStarField(count = 300): THREE.Points {
   });
 
   return new THREE.Points(geo, mat);
+}
+
+/**
+ * สร้างเสาแสงและคลื่นเรดาร์พุ่งขึ้นฟ้าเหนือผู้ถือระเบิด (Sky Beacon & Radar Rings)
+ * ช่วยให้ผู้เล่นทุกคนสามารถระบุพิกัดของผู้ถือระเบิดได้อย่างง่ายดายจากทุกระยะในฉาก 90x90m
+ */
+export function createSkyBeacon(): THREE.Group {
+  const group = new THREE.Group();
+
+  // 1. เสาแสงนีออนพุ่งขึ้นฟ้า 35 เมตร
+  const beamGeo = new THREE.CylinderGeometry(0.18, 0.7, 35, 10, 1, true);
+  const beamMat = new THREE.MeshBasicMaterial({
+    color: 0xff3b30,
+    transparent: true,
+    opacity: 0.45,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+  });
+  const beam = new THREE.Mesh(beamGeo, beamMat);
+  beam.position.y = 17.5;
+  beam.renderOrder = 980;
+  group.add(beam);
+
+  // 2. วงแหวนเรดาร์ 3 ชั้น
+  for (let i = 0; i < 3; i++) {
+    const ringGeo = new THREE.RingGeometry(0.6 + i * 0.4, 0.8 + i * 0.4, 20);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0xff4500,
+      transparent: true,
+      opacity: 0.6 - i * 0.15,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 2.8 + i * 0.8;
+    ring.renderOrder = 981;
+    group.add(ring);
+  }
+
+  return group;
+}
+
+/**
+ * สร้าง Outline และ Silhouette ทะลุกำแพงตามสีประจำตัวละคร (Through-wall Colored Silhouette)
+ * เมื่อผู้เล่นหลบหลังสิ่งกีดขวางหรือแพลตฟอร์ม จะมองเห็นขอบและเงามือ/รูปทรงสีประจำตัวละครทะลุออกมาได้ทันที
+ */
+export function createPlayerOutlineMesh(color: number): THREE.Group {
+  const group = new THREE.Group();
+
+  // 1. เปลือกนอก Wireframe Outline ตามสีประจำตัวละคร
+  const outlineGeo = new THREE.CapsuleGeometry(0.52, 0.95, 6, 12);
+  const wireframeMat = new THREE.MeshBasicMaterial({
+    color,
+    wireframe: true,
+    transparent: true,
+    opacity: 0.85,
+    depthTest: false,
+    depthWrite: false,
+  });
+  const wireframeMesh = new THREE.Mesh(outlineGeo, wireframeMat);
+  wireframeMesh.name = 'outline_wireframe';
+  wireframeMesh.position.y = 0.85;
+  wireframeMesh.renderOrder = 992;
+  group.add(wireframeMesh);
+
+  // 2. เปลือกใน Silhouette เรืองแสงโปร่งแสง ให้เห็นรูปทรงตัวละครชัดเจนแม้อยู่หลังกำแพง
+  const silhouetteGeo = new THREE.CapsuleGeometry(0.46, 0.85, 6, 10);
+  const silhouetteMat = new THREE.MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity: 0.35,
+    depthTest: false,
+    depthWrite: false,
+  });
+  const silhouetteMesh = new THREE.Mesh(silhouetteGeo, silhouetteMat);
+  silhouetteMesh.name = 'outline_silhouette';
+  silhouetteMesh.position.y = 0.85;
+  silhouetteMesh.renderOrder = 991;
+  group.add(silhouetteMesh);
+
+  return group;
+}
+
+/**
+ * สร้างป้ายชื่อ 3D ลอยเหนือหัวผู้เล่น (Floating Billboard Nameplate)
+ * เรนเดอร์ชื่อและสีตัวละครลง Canvas แล้วแปลงเป็น Billboard Sprite ที่มองทะลุกำแพงได้ (depthTest: false)
+ */
+export function createPlayerNameplate(name: string, color: number, isLocal: boolean): THREE.Sprite {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+
+  if (ctx) {
+    const hexColor = '#' + color.toString(16).padStart(6, '0');
+
+    // พื้นหลังมน (Rounded Pill Background)
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+    ctx.beginPath();
+    ctx.roundRect(10, 10, 236, 44, 22);
+    ctx.fill();
+
+    // เส้นขอบตามสีตัวละคร
+    ctx.strokeStyle = hexColor;
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    // วงกลมสัญลักษณ์สีตัวละคร
+    ctx.fillStyle = hexColor;
+    ctx.beginPath();
+    ctx.arc(36, 32, 10, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ตัวอักษรชื่อผู้เล่น
+    ctx.font = 'bold 22px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.textBaseline = 'middle';
+    const displayName = isLocal ? `${name} (You)` : name;
+    const trimmed = displayName.length > 14 ? displayName.slice(0, 13) + '…' : displayName;
+    ctx.fillText(trimmed, 58, 33);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  const mat = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+  });
+
+  const sprite = new THREE.Sprite(mat);
+  sprite.name = 'nameplate';
+  sprite.scale.set(1.9, 0.48, 1);
+  sprite.position.y = 2.45;
+  sprite.renderOrder = 998;
+
+  return sprite;
 }

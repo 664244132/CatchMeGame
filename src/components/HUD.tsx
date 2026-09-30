@@ -19,7 +19,7 @@ interface Props {
  * 4. Safe Area Insets: ปรับระยะเว้นขอบบน-ล่างให้พอดีกับติ่งกล้องและขอบจอมือถือ
  */
 export default function HUD({ state, round, totalRounds }: Props) {
-  const { players, bombTimer, message, dashCooldown } = state;
+  const { players, bombTimer, message, dashCooldown, bombDistance } = state;
   const [showPlayerList, setShowPlayerList] = useState(false);
 
   const alive = players.filter((p) => !p.isDead);
@@ -48,7 +48,7 @@ export default function HUD({ state, round, totalRounds }: Props) {
           </div>
         </div>
 
-        {/* กล่องเวลาระเบิดตรงกลาง (Center Bomb Timer) */}
+        {/* กล่องเวลาระเบิดตรงกลาง (Center Bomb Timer) พร้อม Radar Distance Badge */}
         {cat && (
           <div className="flex-1 flex justify-center max-w-xs sm:max-w-md mx-1">
             <div
@@ -58,8 +58,19 @@ export default function HUD({ state, round, totalRounds }: Props) {
                   : 'bg-black/60 border-white/20'
               }`}
             >
-              <div className="text-white/80 text-[10px] sm:text-xs font-semibold tracking-wider uppercase mb-0.5 truncate max-w-[160px] sm:max-w-none text-center">
-                💣 <span className="text-yellow-300 font-bold">{cat.name}</span> has the bomb!
+              <div className="text-white/80 text-[10px] sm:text-xs font-semibold tracking-wider uppercase mb-0.5 truncate max-w-[210px] sm:max-w-none text-center flex items-center justify-center gap-1.5 flex-wrap">
+                <span>💣 <span className="text-yellow-300 font-bold">{cat.name}</span> has the bomb!</span>
+                {bombDistance !== undefined && !humanIsIt && (
+                  <span className="bg-red-500/80 text-white text-[9px] sm:text-[10px] font-bold px-1.5 py-0.2 rounded-full border border-red-300/40 tracking-normal shadow-sm flex items-center gap-0.5 animate-pulse">
+                    <span>📍</span>
+                    <span>{Math.round(bombDistance)}m</span>
+                  </span>
+                )}
+                {humanIsIt && (
+                  <span className="bg-yellow-400 text-black text-[9px] sm:text-[10px] font-black px-1.5 py-0.2 rounded-full tracking-normal shadow-sm animate-bounce">
+                    YOU!
+                  </span>
+                )}
               </div>
 
               <div

@@ -21,10 +21,35 @@
 | **11** | อัปเกรดระบบเชื่อมต่อห้องเป็น WebRTC P2P (PeerJS) เล่นข้ามอุปกรณ์ได้จริง (มือถือ ↔ คอมพิวเตอร์) โดยไม่ใช้ Database พร้อม Dual-Transport Fallback | สำเร็จ |
 | **12** | ปรับปรุงกลไกการส่งต่อระเบิด (Continuous Bomb Countdown): เมื่อแตะส่งต่อระเบิด เวลาจะไม่ถูก Reset แต่นับถอยหลังต่อทันที พร้อมคูลดาวน์ No Tag-backs 1.0s | สำเร็จ |
 | **13** | ปรับปรุง UI แจ้งเตือน (ย้ายขึ้นด้านบน ขนาดกะทัดรัดไม่บังจอ 3D) และปรับตำแหน่งปุ่มควบคุมบนมือถือยกสูงพ้นขอบล่างจอ (Mobile Controls Ergonomics) | สำเร็จ |
+| **14** | เพิ่มระบบระบุตำแหน่งผู้เล่น (Locator System): เสาแสง Sky Beacon 35m, ป้ายชื่อ 3D ลอยเหนือหัว, Outline & Silhouette ทะลุกำแพงหลากสีตามตัวละคร และ Distance Tracker บน HUD | สำเร็จ |
+| **15** | แก้ไขคำเตือน Config & Canonical Classes: กำจัด `baseUrl` ที่ deprecated ใน `tsconfig.json` และปรับคลาส `h-[100dvh]` เป็น `h-dvh` ตามมาตรฐาน Tailwind CSS | สำเร็จ |
 
 ---
 
 ## 🚀 ประวัติการปรับปรุงรอบปัจจุบัน (Current Active Session)
+
+### 🔹 การแก้ไขคำเตือน Deprecated baseUrl และ Tailwind Canonical Classes (Milestone 15)
+- **[tsconfig.json](file:///C:/Users/k2pwm/Downloads/CatchMeGame/tsconfig.json):**
+  - นำออปชัน `"baseUrl": "."` ออก เพื่อกำจัด Deprecation Warning และรองรับ TypeScript 7.0 อย่างสมบูรณ์ โดย `moduleResolution: "bundler"` รองรับ `paths` แบบ Relative (`"./src/*"`) ได้โดยตรง
+- **[src/App.tsx](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/App.tsx):**
+  - ปรับเปลี่ยนคลาส `h-[100dvh]` เป็นคลาสมาตรฐาน `h-dvh` ตามคำแนะนำของ Tailwind CSS IntelliSense
+
+### 🔹 การเพิ่มระบบระบุตำแหน่งผู้เล่นและ Outline ทะลุกำแพงหลากสีตามตัวละคร (Milestone 14)
+- **[src/game/meshFactory.ts](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/game/meshFactory.ts):**
+  - เพิ่มฟังก์ชัน `createPlayerOutlineMesh(color: number)`: สร้าง Wireframe Outline + Semi-transparent Silhouette เปลือกนอก-ในด้วย Capsule Geometry โดยเปิด `depthTest: false` และกำหนด `renderOrder: 991-992` ช่วยให้มองเห็นเส้นขอบและเงามือรูปทรงตัวละครสีประจำตัวผู้เล่นแต่ละคนทะลุผ่าน Object Block หรือ Platform ได้ชัดเจน 100%
+  - เพิ่มฟังก์ชัน `createPlayerNameplate(name: string, color: number, isLocal: boolean)`: สร้าง Billboard Sprite แสดงชื่อและกรอบสีประจำตัวละครลอยเหนือหัว พร้อมระบุ `(You)` สำหรับผู้เล่นในเครื่อง เปิด `depthTest: false` และ `renderOrder: 998` เพื่อให้มองเห็นชื่อทะลุกำแพงได้ตลอดเวลา
+  - เพิ่มฟังก์ชัน `createSkyBeacon()`: สร้างเสาแสงนีออนความสูง 35 เมตร พร้อมวงแหวนเรดาร์ 3 ชั้น พุ่งขึ้นฟ้าเหนือผู้ถือระเบิด ช่วยให้ผู้เล่นทุกคนในสนาม 90x90m ทราบพิกัดผู้ถือระเบิดได้ทันทีจากทุกระยะ
+- **[src/game/types.ts](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/game/types.ts):**
+  - เพิ่ม `outlineMesh: THREE.Group` และ `nameplate: THREE.Sprite` ใน `PlayerEntity`
+  - เพิ่ม `bombDistance?: number` ใน `GameStateSnapshot`
+- **[src/game/GameEngine.ts](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/game/GameEngine.ts):**
+  - ติดตั้ง Outline Mesh และ Nameplate เข้ากับตัวละครใน `buildPlayers()` และซิงค์ตำแหน่งแบบอัตโนมัติ (Zero-GC)
+  - ปรับปรุง `applyVisual()` ให้ข้ามการเซ็ต Emissive สีส้มทับสีประจำตัวของ Outline และปรับ Visibility เมื่อตายหรือเริ่มรอบใหม่อย่างแม่นยำ
+  - ปรับปรุง `setLocalPlayerId()` ให้อัปเดตป้ายชื่อ `(You)` ให้ถูกต้องเมื่อมีการเปลี่ยนแปลง ID
+  - คำนวณระยะห่างระหว่างผู้เล่น Local กับผู้ถือระเบิดแบบ Zero-GC ส่งเข้า Snapshot ทุก 33ms
+  - จัดการ Cleanup ทรัพยากร Texture, Material และ Geometry ของ Outline และ Nameplate ครบถ้วนใน `dispose()` ป้องกัน Memory Leak
+- **[src/components/HUD.tsx](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/components/HUD.tsx):**
+  - เพิ่ม Radar Distance Badge แสดงระยะห่างแบบเรียลไทม์ (เช่น `📍 24m`) ข้างชื่อผู้ถือระเบิดในแถบเวลาระเบิดด้านบน
 
 ### 🔹 การปรับปรุง UI แจ้งเตือน และปุ่มควบคุมบนหน้าจอมือถือ (Mobile Ergonomics)
 - **[src/components/HUD.tsx](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/components/HUD.tsx):**

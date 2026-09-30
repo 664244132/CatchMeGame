@@ -136,7 +136,7 @@ export default function App() {
   };
 
   return (
-    <div className="relative w-full h-[100dvh] overflow-hidden bg-black select-none">
+    <div className="relative w-full h-dvh overflow-hidden bg-black select-none">
       {/* Three.js 3D WebGL Canvas */}
       {phase !== GamePhase.LOBBY && phase !== GamePhase.MATCH_SUMMARY && (
         <div
