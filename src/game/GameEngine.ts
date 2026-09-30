@@ -10,7 +10,10 @@ import {
   DASH_COOLDOWN,
   PLAYER_RADIUS,
   TAG_DISTANCE,
+  TAG_DISTANCE_SQ,
   BOMB_START_TIME,
+  STATE_SYNC_INTERVAL,
+  UI_EMIT_INTERVAL,
   PLATFORM_DEFS,
   WALL_DEFS,
   MUSHROOM_SPOTS,
@@ -24,6 +27,7 @@ import type {
   ExplosionParticle,
   PlayerConfig,
   SyncStatePayload,
+  SyncedPlayerState,
   PlayerInputPayload,
 } from "./types"
 import {
@@ -33,6 +37,7 @@ import {
   createStarField,
   createPlayerOutlineMesh,
   createPlayerNameplate,
+  disposeSharedGeometriesAndMaterials,
 } from "./meshFactory"
 import { NetworkManager } from "./networkManager"
 
@@ -58,6 +63,7 @@ export class GameEngine {
   private players: PlayerEntity[] = []
   private platforms: Platform[] = []
   private explosions: ExplosionParticle[] = []
+  private bombIndicator: THREE.Group | null = null
 
   // ─── Game State ───────────────────────────────────────────────────────────
   private bombTimer = BOMB_START_TIME
@@ -80,6 +86,11 @@ export class GameEngine {
   private animFrameId = 0
   private cleanupInput: (() => void) | null = null
   private stateEmitTimer = 0
+  private networkSyncTimer = 0
+
+  // ─── Zero-GC State & Network Caching (50-Player Optimization) ─────────────
+  private _cachedPlayerData: PlayerData[] = []
+  private _cachedSyncedPlayers: SyncedPlayerState[] = []
 
   // ─── Reusable Vectors (Zero-GC Optimization) ──────────────────────────────
   private static readonly UP_VECTOR = new THREE.Vector3(0, 1, 0)
@@ -134,6 +145,10 @@ export class GameEngine {
     // 4. สร้างสภาพแวดล้อมและโมเดลผู้เล่น
     this.buildLighting()
     this.buildArena()
+
+    // สร้างลูกระเบิดและเสาแสง Sky Beacon เพียง 1 ตัวใน Scene (Single Shared Bomb Indicator)
+    this.bombIndicator = createBombIndicator()
+    this.scene.add(this.bombIndicator)
 
     // หากไม่ระบุคอนฟิกผู้เล่น จะสร้าง 2 คนพื้นฐานเป็นอย่างต่ำ
     const configs: PlayerConfig[] =
@@ -280,8 +295,6 @@ export class GameEngine {
       const spawn = spawns[i]
 
       const mesh = createMouseMesh(cfg.color)
-      const bombIndicator = createBombIndicator()
-      mesh.add(bombIndicator)
 
       // สร้าง Outline & Silhouette ทะลุกำแพงตามสีประจำตัวละคร
       const outlineMesh = createPlayerOutlineMesh(cfg.color)
@@ -315,7 +328,6 @@ export class GameEngine {
           isGrounded: true,
         },
         mesh,
-        bombIndicator,
         outlineMesh,
         nameplate,
         dashTimer: 0,
@@ -323,6 +335,8 @@ export class GameEngine {
         isDashing: false,
         dashDir: new THREE.Vector3(),
         keys: new Set<string>(),
+        targetPosition: spawn.clone(),
+        targetRotY: 0,
       })
     }
   }
@@ -378,8 +392,20 @@ export class GameEngine {
       for (let j = 0; j < this.players.length; j++) {
         const p = this.players[j]
         if (p.id === sp.id) {
-          p.body.position.set(sp.x, sp.y, sp.z)
-          p.mesh.rotation.y = sp.rotY
+          if (!p.targetPosition) {
+            p.targetPosition = new THREE.Vector3(sp.x, sp.y, sp.z)
+          } else {
+            p.targetPosition.set(sp.x, sp.y, sp.z)
+          }
+          p.targetRotY = sp.rotY
+
+          // หากเป็นเครื่องเราเอง หรือหากตำแหน่งห่างผิดปกติ (> 8 เมตร เช่น จุดเกิดใหม่) ให้ Snap ทันที
+          const distSq = p.body.position.distanceToSquared(p.targetPosition)
+          if (p.id === this.localPlayerId || distSq > 64) {
+            p.body.position.copy(p.targetPosition)
+            p.mesh.rotation.y = sp.rotY
+          }
+
           p.data.isCat = sp.isCat
           p.data.isDead = sp.isDead
           p.data.survivalCount = sp.survivalCount
@@ -449,6 +475,8 @@ export class GameEngine {
       p.nameplate.visible = true
       p.dashCooldown = 0
       p.isDashing = false
+      p.targetPosition?.copy(spawn)
+      p.targetRotY = 0
 
       this.applyVisual(p)
     }
@@ -477,13 +505,38 @@ export class GameEngine {
     this.network.off("remote_input", this.handleRemoteInput)
     this.network.off("sync_state", this.handleSyncState)
 
-    // กำจัดทรัพยากร Mesh, Outline และ Nameplate ของผู้เล่นทุกคน
+    // 1. กำจัด Bomb Indicator และ PointLight ส่วนกลาง
+    if (this.bombIndicator) {
+      this.scene.remove(this.bombIndicator)
+      this.bombIndicator.traverse((obj) => {
+        if (obj instanceof THREE.Mesh) {
+          obj.geometry?.dispose()
+          if (Array.isArray(obj.material)) {
+            obj.material.forEach((m) => m.dispose())
+          } else {
+            obj.material?.dispose()
+          }
+        }
+      })
+      this.bombIndicator = null
+    }
+
+    // 2. กำจัดทรัพยากร Mesh, Outline และ Nameplate ของผู้เล่นทุกคน
     for (let i = 0; i < this.players.length; i++) {
       const p = this.players[i]
+      this.scene.remove(p.mesh)
+      p.mesh.traverse((obj) => {
+        if (obj instanceof THREE.Mesh) {
+          if (Array.isArray(obj.material)) {
+            obj.material.forEach((m) => m.dispose())
+          } else {
+            obj.material?.dispose()
+          }
+        }
+      })
       if (p.outlineMesh) {
         p.outlineMesh.traverse((obj) => {
           if (obj instanceof THREE.Mesh) {
-            obj.geometry?.dispose()
             if (Array.isArray(obj.material)) {
               obj.material.forEach((m) => m.dispose())
             } else {
@@ -498,7 +551,7 @@ export class GameEngine {
       }
     }
 
-    // กำจัดละอองอนุภาคระเบิดที่ยังค้างอยู่ใน Scene
+    // 3. กำจัดละอองอนุภาคระเบิดที่ยังค้างอยู่ใน Scene
     for (let i = 0; i < this.explosions.length; i++) {
       const ex = this.explosions[i]
       this.scene.remove(ex.points)
@@ -512,6 +565,9 @@ export class GameEngine {
       }
     }
     this.explosions = []
+
+    // 4. ปลดปล่อยหน่วยความจำ Shared Geometries & Materials ส่วนกลาง
+    disposeSharedGeometriesAndMaterials()
 
     this.renderer.dispose()
   }
@@ -550,7 +606,6 @@ export class GameEngine {
       }
     })
 
-    p.bombIndicator.visible = isCat && !isDead
     p.outlineMesh.visible = !isDead
     p.nameplate.visible = !isDead
   }
@@ -601,25 +656,39 @@ export class GameEngine {
   private update(dt: number) {
     const now = performance.now() * 0.001
 
-    // 1. อัปเดตลูกระเบิดและชนวนไฟเหนือหัวผู้ถือระเบิด
+    // 1. อัปเดตลูกระเบิดและเสาแสง Sky Beacon กลางเพียง 1 ตัวในฉาก (Single Active Bomb Indicator)
+    let activeCat: PlayerEntity | null = null
     for (let i = 0; i < this.players.length; i++) {
       const p = this.players[i]
-      if (!p.data.isCat || p.data.isDead) continue
+      if (p.data.isCat && !p.data.isDead) {
+        activeCat = p
+        break
+      }
+    }
 
+    if (activeCat && this.bombIndicator && this.roundActive) {
+      this.bombIndicator.visible = true
       const urgency = Math.max(0, 1 - this.bombTimer / BOMB_START_TIME)
       const pulseRate = 6 + urgency * 18
       const scale = 1 + Math.sin(now * pulseRate) * (0.08 + urgency * 0.16)
-      p.bombIndicator.scale.set(scale, scale, scale)
+      this.bombIndicator.scale.set(scale, scale, scale)
 
-      p.bombIndicator.position.y = 1.35 + Math.sin(now * 5) * 0.08
-      p.bombIndicator.rotation.y += dt * 3.5
+      // ตามพิกัดของผู้ถือระเบิด พร้อมลอยกระเพื่อมอย่างนุ่มนวล
+      this.bombIndicator.position.set(
+        activeCat.mesh.position.x,
+        activeCat.mesh.position.y + Math.sin(now * 5) * 0.08,
+        activeCat.mesh.position.z,
+      )
+      this.bombIndicator.rotation.y += dt * 3.5
 
-      const spark = p.bombIndicator.getObjectByName(
-        "spark",
+      const bombLight = this.bombIndicator.getObjectByName(
+        "bombLight",
       ) as THREE.PointLight | null
-      if (spark) {
-        spark.intensity = 2 + Math.sin(now * 30) * 1.5 + urgency * 3
+      if (bombLight) {
+        bombLight.intensity = 1.5 + Math.sin(now * 30) * 1.0 + urgency * 3
       }
+    } else if (this.bombIndicator) {
+      this.bombIndicator.visible = false
     }
 
     // 2. อัปเดตละอองอนุภาคการระเบิด (In-Place Loop & Zero-GC Float32Array)
@@ -690,10 +759,23 @@ export class GameEngine {
       }
     }
 
-    // 5. ซิงค์ตำแหน่ง Mesh และแอนิเมชันกระเพื่อม (Bobbing)
+    // 5. ซิงค์ตำแหน่ง Mesh และทำ Smooth Lerp Interpolation สำหรับ Remote Players บนเครื่อง Client
+    const clientLerpFactor = Math.min(1, dt * 18)
     for (let i = 0; i < this.players.length; i++) {
       const p = this.players[i]
       if (p.data.isDead) continue
+
+      // บนเครื่อง Client ให้ Remote Players ค่อยๆ เคลื่อนที่เข้าหาเป้าหมายอย่างนุ่มนวล (60 FPS Motion)
+      if (!this.isHost && p.targetPosition && p.id !== this.localPlayerId) {
+        p.body.position.lerp(p.targetPosition, clientLerpFactor)
+        if (typeof p.targetRotY === "number") {
+          p.mesh.rotation.y = THREE.MathUtils.lerp(
+            p.mesh.rotation.y,
+            p.targetRotY,
+            clientLerpFactor,
+          )
+        }
+      }
 
       const bob = Math.sin(now * 3 + p.id * 0.7) * 0.06
       p.mesh.position.x = p.body.position.x
@@ -704,9 +786,18 @@ export class GameEngine {
     // 6. มุมกล้องติดตามผู้เล่น Local Player
     this.updateCamera(dt)
 
-    // 7. ส่ง State Snapshot ไปยัง React HUD (~30 FPS) เพื่อลดภาระ Re-render
+    // 7. ซิงค์สถานะเกมผ่านเครือข่ายไปยัง Guest (Host-Authoritative at 20 Hz = 50ms)
+    if (this.isHost && this.network.roomCode) {
+      this.networkSyncTimer += dt
+      if (this.networkSyncTimer >= STATE_SYNC_INTERVAL) {
+        this.networkSyncTimer = 0
+        this.broadcastNetworkState()
+      }
+    }
+
+    // 8. ส่ง State Snapshot ไปยัง React HUD (~30 FPS) เพื่อลดภาระ Re-render
     this.stateEmitTimer += dt
-    if (this.stateEmitTimer >= 0.033) {
+    if (this.stateEmitTimer >= UI_EMIT_INTERVAL) {
       this.stateEmitTimer = 0
       this.emitState()
     }
@@ -866,7 +957,10 @@ export class GameEngine {
       const p = this.players[i]
       if (p.id === cat.id || p.data.isDead) continue
 
-      if (cat.body.position.distanceTo(p.body.position) < TAG_DISTANCE) {
+      // Zero-Sqrt Distance Check: เปรียบเทียบระยะทางกำลังสองเพื่อตัด Math.sqrt ออกทั้งหมด
+      if (
+        cat.body.position.distanceToSquared(p.body.position) < TAG_DISTANCE_SQ
+      ) {
         this.passBomb(cat, p)
         break
       }
@@ -905,7 +999,7 @@ export class GameEngine {
     cat.data.isDead = true
     cat.data.isCat = false
     cat.mesh.visible = false
-    cat.bombIndicator.visible = false
+    if (this.bombIndicator) this.bombIndicator.visible = false
     cat.outlineMesh.visible = false
     cat.nameplate.visible = false
 
@@ -1026,6 +1120,59 @@ export class GameEngine {
     this.camera.lookAt(this.smoothLookAt)
   }
 
+  /**
+   * ซิงค์สถานะเกมผ่านเครือข่ายไปยังเครื่องลูกข่าย (Host-Authoritative at 20 Hz = 50ms)
+   * Zero-GC & Bandwidth Compression:
+   * 1. นำอ็อบเจกต์ใน _cachedSyncedPlayers กลับมาใช้ซ้ำ 100% ไม่สร้าง Object ขยะ
+   * 2. ปัดเศษทศนิยมพิกัดเหลือ 2 ตำแหน่ง ช่วยลดขนาด JSON ลงกว่า 50% สำหรับ 50 ผู้เล่น
+   */
+  private broadcastNetworkState() {
+    if (!this.isHost || !this.network.roomCode) return
+
+    for (let i = 0; i < this.players.length; i++) {
+      const p = this.players[i]
+      let sp = this._cachedSyncedPlayers[i]
+      if (!sp) {
+        sp = {
+          id: p.id,
+          x: Math.round(p.body.position.x * 100) / 100,
+          y: Math.round(p.body.position.y * 100) / 100,
+          z: Math.round(p.body.position.z * 100) / 100,
+          rotY: Math.round(p.mesh.rotation.y * 100) / 100,
+          isCat: p.data.isCat,
+          isDead: p.data.isDead,
+          survivalCount: p.data.survivalCount,
+          bombsDeflected: p.data.bombsDeflected,
+          dashCooldown: Math.round(p.dashCooldown * 10) / 10,
+        }
+        this._cachedSyncedPlayers[i] = sp
+      } else {
+        sp.id = p.id
+        sp.x = Math.round(p.body.position.x * 100) / 100
+        sp.y = Math.round(p.body.position.y * 100) / 100
+        sp.z = Math.round(p.body.position.z * 100) / 100
+        sp.rotY = Math.round(p.mesh.rotation.y * 100) / 100
+        sp.isCat = p.data.isCat
+        sp.isDead = p.data.isDead
+        sp.survivalCount = p.data.survivalCount
+        sp.bombsDeflected = p.data.bombsDeflected
+        sp.dashCooldown = Math.round(p.dashCooldown * 10) / 10
+      }
+    }
+
+    this.network.sendMessage("SYNC_STATE", {
+      bombTimer: Math.round(this.bombTimer * 10) / 10,
+      bombHolderId: this.bombHolderId,
+      message: this.currentMessage,
+      roundActive: this.roundActive,
+      players: this._cachedSyncedPlayers,
+    })
+  }
+
+  /**
+   * ส่ง State Snapshot ไปยัง React HUD (~30 FPS)
+   * Zero-GC Snapshot Pooling: คัดลอกค่าลงใน _cachedPlayerData เดิมเพื่อหลีกเลี่ยงการสร้าง 50 Object ใหม่ทุก 33ms
+   */
   private emitState() {
     let localPlayer: PlayerEntity | null = null
     let bombHolder: PlayerEntity | null = null
@@ -1037,6 +1184,22 @@ export class GameEngine {
       }
       if (p.id === this.bombHolderId && !p.data.isDead) {
         bombHolder = p
+      }
+
+      // ปรับปรุงแคช PlayerData ในตำแหน่งเดิม (Zero-GC)
+      let cached = this._cachedPlayerData[i]
+      if (!cached) {
+        cached = { ...p.data }
+        this._cachedPlayerData[i] = cached
+      } else {
+        cached.id = p.data.id
+        cached.name = p.data.name
+        cached.isHuman = p.data.isHuman
+        cached.isCat = p.data.isCat
+        cached.isDead = p.data.isDead
+        cached.survivalCount = p.data.survivalCount
+        cached.bombsDeflected = p.data.bombsDeflected
+        cached.color = p.data.color
       }
     }
 
@@ -1053,29 +1216,8 @@ export class GameEngine {
       )
     }
 
-    if (this.isHost && this.network.roomCode) {
-      this.network.sendMessage("SYNC_STATE", {
-        bombTimer: this.bombTimer,
-        bombHolderId: this.bombHolderId,
-        message: this.currentMessage,
-        roundActive: this.roundActive,
-        players: this.players.map((p) => ({
-          id: p.id,
-          x: p.body.position.x,
-          y: p.body.position.y,
-          z: p.body.position.z,
-          rotY: p.mesh.rotation.y,
-          isCat: p.data.isCat,
-          isDead: p.data.isDead,
-          survivalCount: p.data.survivalCount,
-          bombsDeflected: p.data.bombsDeflected,
-          dashCooldown: p.dashCooldown,
-        })),
-      })
-    }
-
     this.onStateUpdate({
-      players: this.players.map((p) => ({ ...p.data })),
+      players: this._cachedPlayerData.slice(),
       bombTimer: this.bombTimer,
       bombHolderId: this.bombHolderId,
       message: this.currentMessage,

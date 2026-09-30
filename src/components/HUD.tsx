@@ -1,5 +1,5 @@
-import { useState } from "react"
-import type { GameStateSnapshot } from "../game/types"
+import { useState, memo } from "react"
+import type { GameStateSnapshot, PlayerData } from "../game/types"
 import { BOMB_START_TIME } from "../game/constants"
 import VirtualJoystick from "./VirtualJoystick"
 
@@ -8,6 +8,89 @@ interface Props {
   round: number
   totalRounds: number
 }
+
+/**
+ * แถวแสดงสถานะผู้เล่นบนหน้าจอคอมพิวเตอร์ (Memoized Desktop Player Row)
+ * ป้องกันการ Re-render ซ้ำซ้อน 50 แถวเมื่อเวลาระเบิด (bombTimer) นับถอยหลัง
+ */
+const DesktopPlayerRow = memo(function DesktopPlayerRow({
+  player,
+}: {
+  player: PlayerData
+}) {
+  return (
+    <div
+      className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs backdrop-blur-sm transition-all ${
+        player.isDead
+          ? "opacity-40 bg-black/40 border-white/10 text-white/50"
+          : player.isCat
+            ? "bg-orange-600/80 border-orange-400 text-white shadow-[0_0_12px_rgba(255,100,0,0.5)]"
+            : player.isHuman
+              ? "bg-blue-600/70 border-blue-400 text-white"
+              : "bg-black/50 border-white/15 text-white"
+      }`}
+    >
+      <div
+        className="w-2.5 h-2.5 rounded-full shrink-0"
+        style={{
+          backgroundColor: `#${player.color.toString(16).padStart(6, "0")}`,
+        }}
+      />
+      <span className="font-medium truncate max-w-25">
+        {player.isHuman ? "★ " : ""}
+        {player.name}
+      </span>
+      {player.isCat && !player.isDead && <span className="text-xs">💣</span>}
+      {player.isDead && <span className="text-xs">💀</span>}
+      <span className="ml-auto pl-2 text-white/60 font-mono">
+        {player.survivalCount}
+      </span>
+    </div>
+  )
+})
+
+/**
+ * แถวแสดงสถานะผู้เล่นใน Drawer สำหรับจอมือถือ (Memoized Mobile Drawer Row)
+ */
+const DrawerPlayerRow = memo(function DrawerPlayerRow({
+  player,
+}: {
+  player: PlayerData
+}) {
+  return (
+    <div
+      className={`flex items-center justify-between px-3 py-2 rounded-xl border text-sm transition-all ${
+        player.isDead
+          ? "opacity-40 bg-black/30 border-white/10 text-white/40"
+          : player.isCat
+            ? "bg-orange-500/20 border-orange-400 text-orange-200 font-bold"
+            : "bg-white/5 border-white/10 text-white"
+      }`}
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        <span
+          className="w-3 h-3 rounded-full shrink-0"
+          style={{
+            backgroundColor: `#${player.color.toString(16).padStart(6, "0")}`,
+          }}
+        />
+        <span className="truncate">
+          {player.isHuman ? "★ " : ""}
+          {player.name}
+        </span>
+      </div>
+      <div className="flex items-center gap-1.5 text-xs shrink-0 ml-2">
+        {player.isCat && !player.isDead && (
+          <span className="text-orange-400 font-bold">💣 IT</span>
+        )}
+        {player.isDead && <span className="text-red-400">💀 Dead</span>}
+        {!player.isDead && !player.isCat && (
+          <span className="text-emerald-400">✓ Alive</span>
+        )}
+      </div>
+    </div>
+  )
+})
 
 /**
  * HUD - หน้าต่างส่วนติดต่อผู้ใช้ในเกม (Heads-Up Display)
@@ -22,10 +105,21 @@ export default function HUD({ state, round, totalRounds }: Props) {
   const { players, bombTimer, message, dashCooldown, bombDistance } = state
   const [showPlayerList, setShowPlayerList] = useState(false)
 
-  const alive = players.filter((p) => !p.isDead)
-  const cat = players.find((p) => p.isCat && !p.isDead)
-  const human = players.find((p) => p.isHuman)
-  const humanIsIt = human?.isCat && !human.isDead
+  // Single-pass Player Analysis: ค้นหา cat, human, และนับคนรอดในลูปเดียว (ลดการวนลูปซ้ำซ้อน 3 รอบทุก 33ms)
+  let aliveCount = 0
+  let cat: PlayerData | null = null
+  let human: PlayerData | null = null
+
+  for (let i = 0; i < players.length; i++) {
+    const p = players[i]
+    if (!p.isDead) {
+      aliveCount++
+      if (p.isCat) cat = p
+    }
+    if (p.isHuman) human = p
+  }
+
+  const humanIsIt = Boolean(human?.isCat && !human.isDead)
 
   // คำนวณเปอร์เซ็นต์เวลาระเบิด (อ้างอิงจาก BOMB_START_TIME = 15.0 วินาที)
   const timerPct = Math.max(0, bombTimer / BOMB_START_TIME)
@@ -61,7 +155,7 @@ export default function HUD({ state, round, totalRounds }: Props) {
                   : "bg-black/60 border-white/20"
               }`}
             >
-              <div className="text-white/80 text-[10px] sm:text-xs font-semibold tracking-wider uppercase mb-0.5 truncate max-w-[210px] sm:max-w-none text-center flex items-center justify-center gap-1.5 flex-wrap">
+              <div className="text-white/80 text-[10px] sm:text-xs font-semibold tracking-wider uppercase mb-0.5 truncate max-w-52.5 sm:max-w-none text-center flex items-center justify-center gap-1.5 flex-wrap">
                 <span>
                   💣{" "}
                   <span className="text-yellow-300 font-bold">{cat.name}</span>{" "}
@@ -114,7 +208,7 @@ export default function HUD({ state, round, totalRounds }: Props) {
             <span className="text-xs">👥</span>
           </div>
           <div className="text-emerald-400 font-display text-base sm:text-xl leading-tight">
-            {alive.length}{" "}
+            {aliveCount}{" "}
             <span className="text-white/40 text-xs sm:text-sm">
               / {players.length}
             </span>
@@ -126,46 +220,19 @@ export default function HUD({ state, round, totalRounds }: Props) {
       {/* 2. PLAYER LIST (Desktop แสดงข้างซ้าย / Mobile เปิดเป็น Drawer) */}
       {/* ────────────────────────────────────────────────────────────────── */}
       {/* Desktop view: ลิสต์ผู้เล่นด้านซ้ายบน ใต้รอบการเล่น */}
-      <div className="hidden lg:flex absolute top-20 left-3 flex-col gap-1.5 max-h-64 overflow-y-auto custom-scrollbar pr-1 z-10 pointer-events-auto">
+      <div className="hidden lg:flex absolute top-20 left-3 flex-col gap-1.5 max-h-72 overflow-y-auto custom-scrollbar pr-1 z-10 pointer-events-auto">
         {players.map((p) => (
-          <div
-            key={p.id}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs backdrop-blur-sm transition-all ${
-              p.isDead
-                ? "opacity-40 bg-black/40 border-white/10 text-white/50"
-                : p.isCat
-                  ? "bg-orange-600/80 border-orange-400 text-white shadow-[0_0_12px_rgba(255,100,0,0.5)]"
-                  : p.isHuman
-                    ? "bg-blue-600/70 border-blue-400 text-white"
-                    : "bg-black/50 border-white/15 text-white"
-            }`}
-          >
-            <div
-              className="w-2.5 h-2.5 rounded-full shrink-0"
-              style={{
-                backgroundColor: `#${p.color.toString(16).padStart(6, "0")}`,
-              }}
-            />
-            <span className="font-medium truncate max-w-[100px]">
-              {p.isHuman ? "★ " : ""}
-              {p.name}
-            </span>
-            {p.isCat && !p.isDead && <span className="text-xs">💣</span>}
-            {p.isDead && <span className="text-xs">💀</span>}
-            <span className="ml-auto pl-2 text-white/60 font-mono">
-              {p.survivalCount}
-            </span>
-          </div>
+          <DesktopPlayerRow key={p.id} player={p} />
         ))}
       </div>
 
       {/* Mobile Drawer view: ปรากฏเมื่อกดปุ่มผู้เล่นมุมขวาบน */}
       {showPlayerList && (
         <div className="lg:hidden absolute inset-0 bg-black/70 backdrop-blur-md z-40 flex items-center justify-center p-4 pointer-events-auto">
-          <div className="bg-slate-900/95 border border-white/20 rounded-3xl p-5 max-w-sm w-full max-h-[75vh] flex flex-col shadow-2xl">
+          <div className="bg-slate-900/95 border border-white/20 rounded-3xl p-5 max-w-lg w-full max-h-[80vh] flex flex-col shadow-2xl">
             <div className="flex items-center justify-between pb-3 border-b border-white/15 mb-3">
               <div className="text-white font-display text-lg">
-                👥 ผู้เล่นทั้งหมด ({alive.length} คนรอด)
+                👥 ผู้เล่นทั้งหมด ({aliveCount} / {players.length} คนรอด)
               </div>
               <button
                 type="button"
@@ -177,41 +244,13 @@ export default function HUD({ state, round, totalRounds }: Props) {
               </button>
             </div>
 
-            <div className="overflow-y-auto custom-scrollbar space-y-2 flex-1 pr-1">
-              {players.map((p) => (
-                <div
-                  key={p.id}
-                  className={`flex items-center justify-between px-3 py-2 rounded-xl border text-sm ${
-                    p.isDead
-                      ? "opacity-40 bg-black/30 border-white/10 text-white/40"
-                      : p.isCat
-                        ? "bg-orange-500/20 border-orange-400 text-orange-200 font-bold"
-                        : "bg-white/5 border-white/10 text-white"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-3 h-3 rounded-full shrink-0"
-                      style={{
-                        backgroundColor: `#${p.color.toString(16).padStart(6, "0")}`,
-                      }}
-                    />
-                    <span>
-                      {p.isHuman ? "★ " : ""}
-                      {p.name}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs">
-                    {p.isCat && !p.isDead && (
-                      <span className="text-orange-400">💣 IT</span>
-                    )}
-                    {p.isDead && <span className="text-red-400">💀 Dead</span>}
-                    {!p.isDead && !p.isCat && (
-                      <span className="text-emerald-400">✓ Alive</span>
-                    )}
-                  </div>
-                </div>
-              ))}
+            {/* Grid 2 คอลัมน์บนจอแท็บเล็ต/มือถือกว้าง และ 1 คอลัมน์บนจอมือถือแคบ */}
+            <div className="overflow-y-auto custom-scrollbar flex-1 pr-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {players.map((p) => (
+                  <DrawerPlayerRow key={p.id} player={p} />
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -226,7 +265,7 @@ export default function HUD({ state, round, totalRounds }: Props) {
             message ? "top-26 sm:top-28" : "top-18 sm:top-22"
           } left-0 right-0 flex justify-center px-4 z-20 pointer-events-none transition-all`}
         >
-          <div className="bg-gradient-to-r from-orange-600 via-red-600 to-amber-600 border border-yellow-300 rounded-full px-4 py-1.5 sm:px-6 sm:py-2 shadow-[0_0_25px_rgba(255,80,0,0.7)] text-center animate-pulse">
+          <div className="bg-linear-to-r from-orange-600 via-red-600 to-amber-600 border border-yellow-300 rounded-full px-4 py-1.5 sm:px-6 sm:py-2 shadow-[0_0_25px_rgba(255,80,0,0.7)] text-center animate-pulse">
             <span className="font-display text-white text-xs sm:text-sm drop-shadow">
               ⚡ YOU HAVE THE BOMB! TAG SOMEONE! 💥
             </span>

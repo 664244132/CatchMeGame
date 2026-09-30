@@ -95,7 +95,7 @@ export interface PlayerEntity {
   data: PlayerData
   body: PhysicsBody
   mesh: THREE.Group
-  bombIndicator: THREE.Group
+  bombIndicator?: THREE.Group
   outlineMesh: THREE.Group // Outline / Silhouette แสดงทะลุกำแพงตามสีประจำตัวละคร
   nameplate: THREE.Sprite // ป้ายชื่อ 3D ลอยเหนือหัวผู้เล่น มองเห็นทะลุกำแพง
   dashTimer: number
@@ -103,6 +103,8 @@ export interface PlayerEntity {
   isDashing: boolean
   dashDir: THREE.Vector3
   keys: Set<string> // คีย์บอร์ดอินพุตของผู้เล่นคนนี้ (ส่งผ่านเน็ตเวิร์กหรือกดเอง)
+  targetPosition?: THREE.Vector3 // พิกัดเป้าหมายสำหรับการทำ Smooth Lerp Interpolation บนเครื่อง Client
+  targetRotY?: number // มุมหมุนเป้าหมายสำหรับการทำ Smooth Lerp Interpolation
 }
 
 /**

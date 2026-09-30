@@ -15,7 +15,10 @@ export const PLAYER_RADIUS = 0.5
 
 // ─── กลไกระเบิดและการแตะส่งระเบิด (Bomb & Tag Mechanics) ─────────────────────
 export const TAG_DISTANCE = 1.9
+export const TAG_DISTANCE_SQ = TAG_DISTANCE * TAG_DISTANCE // 3.61 (หลีกเลี่ยงการคำนวณ Math.sqrt ทุกเฟรม)
 export const BOMB_START_TIME = 15.0 // เวลานับถอยหลังระเบิด 15 วินาที
+export const STATE_SYNC_INTERVAL = 0.05 // ซิงค์เครือข่าย 20 Hz (ทุก 50ms) ประหยัดแบนด์วิดท์สำหรับ 50 ผู้เล่น
+export const UI_EMIT_INTERVAL = 0.033 // อัปเดต React HUD 30 FPS ลดภาระ Re-render
 
 // ─── แพลตฟอร์มสิ่งกีดขวาง 17 จุด (Platforms across 90x90m Arena) ─────────────
 export interface PlatformDef {
