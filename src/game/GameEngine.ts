@@ -60,6 +60,7 @@ export class GameEngine {
   // ─── Game State ───────────────────────────────────────────────────────────
   private bombTimer = BOMB_START_TIME;
   private bombHolderId = 0;
+  private tagCooldown = 0;
   private roundActive = false;
   private localPlayerId = 0;
   public isHost = true;
@@ -407,6 +408,7 @@ export class GameEngine {
 
     this.bombTimer = BOMB_START_TIME;
     this.bombHolderId = catId;
+    this.tagCooldown = 1.0;
     this.roundActive = true;
     this.currentMessage = '';
     this.emitState();
@@ -581,6 +583,10 @@ export class GameEngine {
 
     // 4. การจำลองฟิสิกส์และการแตะส่งระเบิด (Host-Authoritative Step)
     if (this.roundActive && this.isHost) {
+      if (this.tagCooldown > 0) {
+        this.tagCooldown -= dt;
+      }
+
       for (let i = 0; i < this.players.length; i++) {
         const p = this.players[i];
         if (p.data.isDead) continue;
@@ -753,6 +759,8 @@ export class GameEngine {
   // ──────────────────────────────────────────────────────────────────────────
 
   private checkTags() {
+    if (this.tagCooldown > 0) return;
+
     let cat: PlayerEntity | null = null;
     for (let i = 0; i < this.players.length; i++) {
       const p = this.players[i];
@@ -781,11 +789,13 @@ export class GameEngine {
     to.data.isCat = true;
 
     this.bombHolderId = to.id;
-    this.bombTimer = BOMB_START_TIME;
+    // ไม่ reset bombTimer เพื่อให้นับเวลาถอยหลังต่อไปอย่างต่อเนื่องตามกติกา Hot Potato
+    this.tagCooldown = 1.0; // คูลดาวน์ 1.0 วินาทีป้องกันการแตะส่งระเบิดคืนทันที (No tag-backs)
     this.applyVisual(from);
     this.applyVisual(to);
 
-    this.currentMessage = `💥 ${to.name} got the BOMB!`;
+    const remainingSec = Math.max(0, Math.ceil(this.bombTimer));
+    this.currentMessage = `💥 ${to.name} got the BOMB! (${remainingSec}s left)`;
     this.messageTimer = 2;
   }
 
@@ -830,11 +840,12 @@ export class GameEngine {
         this.onRoundEnd(results);
       }, 2200);
     } else {
-      // สุ่มผู้ถือระเบิดคนใหม่จากผู้รอดชีวิต
+      // สุ่มผู้ถือระเบิดคนใหม่จากผู้รอดชีวิต (ระเบิดลูกใหม่ เริ่มนับ 15 วินาทีใหม่)
       const newCat = alive[Math.floor(Math.random() * alive.length)];
       newCat.data.isCat = true;
       this.bombHolderId = newCat.id;
       this.bombTimer = BOMB_START_TIME;
+      this.tagCooldown = 1.0;
       this.applyVisual(newCat);
       setTimeout(() => {
         this.currentMessage = `⚡ ${newCat.name} is now IT!`;

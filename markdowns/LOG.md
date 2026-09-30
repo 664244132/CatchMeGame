@@ -19,10 +19,18 @@
 | **09** | ปรับเวลาระเบิดเป็น 15 วินาที และแก้ไขระบบเข้าร่วมห้อง (Handshake ACK, Room Registry Fallback, Auto-Retry) ป้องกันการหมุนค้าง | สำเร็จ |
 | **10** | ปรับแต่ง Vite Build Config (`chunkSizeWarningLimit: 1000` และ Code Splitting `manualChunks` สำหรับ Three.js และ React) กำจัด Chunk Size Warning | สำเร็จ |
 | **11** | อัปเกรดระบบเชื่อมต่อห้องเป็น WebRTC P2P (PeerJS) เล่นข้ามอุปกรณ์ได้จริง (มือถือ ↔ คอมพิวเตอร์) โดยไม่ใช้ Database พร้อม Dual-Transport Fallback | สำเร็จ |
+| **12** | ปรับปรุงกลไกการส่งต่อระเบิด (Continuous Bomb Countdown): เมื่อแตะส่งต่อระเบิด เวลาจะไม่ถูก Reset แต่นับถอยหลังต่อทันที พร้อมคูลดาวน์ No Tag-backs 1.0s | สำเร็จ |
 
 ---
 
 ## 🚀 ประวัติการปรับปรุงรอบปัจจุบัน (Current Active Session)
+
+### 🔹 การปรับปรุงกลไกระเบิดนับถอยหลังต่อเนื่อง (Continuous Bomb Countdown)
+- **[src/game/GameEngine.ts](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/game/GameEngine.ts):**
+  - ในฟังก์ชัน `passBomb()`: ยกเลิกการ Reset เวลา `this.bombTimer = BOMB_START_TIME` เพื่อให้นาฬิกานับถอยหลังจากเวลาเดิมต่อไปอย่างต่อเนื่องตามกติกา Hot Potato แท้จริง
+  - ติดตั้งตัวแปร `tagCooldown` ขนาด 1.0 วินาที เพื่อป้องกันการแตะส่งระเบิดกลับทันที (No Tag-backs)
+  - ปรับข้อความประกาศ `currentMessage` ให้แสดงเวลาที่เหลืออยู่แบบเรียลไทม์ เช่น `💥 Player 2 got the BOMB! (8s left)`
+  - คงการรีเซ็ตเวลา 15.0 วินาทีไว้เฉพาะตอนเริ่มรอบใหม่ (`startRound`) และตอนที่มีผู้เล่นระเบิดตายแล้วสุ่มระเบิดลูกใหม่ให้ผู้รอดชีวิต (`handleExplosion`)
 
 ### 🔹 การพัฒนาระบบ Cross-Device WebRTC P2P (เล่นข้ามเครื่องจริง 100%)
 - **[package.json](file:///C:/Users/k2pwm/Downloads/CatchMeGame/package.json):**
