@@ -28,8 +28,7 @@ let _catEyeGeo: THREE.SphereGeometry | null = null
 let _catNoseGeo: THREE.SphereGeometry | null = null
 let _catTailGeo: THREE.TubeGeometry | null = null
 
-let _outlineWireframeGeo: THREE.CapsuleGeometry | null = null
-let _outlineSilhouetteGeo: THREE.CapsuleGeometry | null = null
+let _outlineRingGeo: THREE.RingGeometry | null = null
 
 // ─── แคชวัสดุคงที่ส่วนกลาง (Shared Common Materials Cache) ────────────────────
 let _sharedDarkMat: THREE.MeshLambertMaterial | null = null
@@ -93,11 +92,6 @@ export interface CatGeometries {
   eye: THREE.SphereGeometry
   nose: THREE.SphereGeometry
   tail: THREE.TubeGeometry
-}
-
-export interface OutlineGeometries {
-  wireframe: THREE.CapsuleGeometry
-  silhouette: THREE.CapsuleGeometry
 }
 
 function getMouseGeometries(): MouseGeometries {
@@ -176,15 +170,11 @@ function getCatGeometries(): CatGeometries {
   }
 }
 
-function getOutlineGeometries(): OutlineGeometries {
-  if (!_outlineWireframeGeo || !_outlineSilhouetteGeo) {
-    _outlineWireframeGeo = new THREE.CapsuleGeometry(0.52, 0.95, 6, 12)
-    _outlineSilhouetteGeo = new THREE.CapsuleGeometry(0.46, 0.85, 6, 10)
+function getOutlineRingGeometry(): THREE.RingGeometry {
+  if (!_outlineRingGeo) {
+    _outlineRingGeo = new THREE.RingGeometry(0.58, 0.68, 36)
   }
-  return {
-    wireframe: _outlineWireframeGeo,
-    silhouette: _outlineSilhouetteGeo,
-  }
+  return _outlineRingGeo
 }
 
 /**
@@ -223,10 +213,8 @@ export function disposeSharedGeometriesAndMaterials(): void {
   _catNoseGeo = null
   _catTailGeo = null
 
-  _outlineWireframeGeo?.dispose()
-  _outlineSilhouetteGeo?.dispose()
-  _outlineWireframeGeo = null
-  _outlineSilhouetteGeo = null
+  _outlineRingGeo?.dispose()
+  _outlineRingGeo = null
 
   _sharedDarkMat?.dispose()
   _sharedPinkMat?.dispose()
@@ -521,41 +509,26 @@ export function createSkyBeacon(): THREE.Group {
 }
 
 /**
- * สร้าง Outline และ Silhouette ทะลุกำแพงตามสีประจำตัวละคร (Through-wall Colored Silhouette)
- * เมื่อผู้เล่นหลบหลังสิ่งกีดขวางหรือแพลตฟอร์ม จะมองเห็นขอบและเงามือ/รูปทรงสีประจำตัวละครทะลุออกมาได้ทันที
+ * สร้างเส้นกรอบวงแหวนสีประจำตัวละคร (Player Ground Outline Ring)
+ * เป็นเส้นกรอบเดี่ยวรอบตัวผู้เล่นบนพื้น ไม่บังโมเดลตัวละคร และระบุสีประจำตัวชัดเจน
  */
 export function createPlayerOutlineMesh(color: number): THREE.Group {
   const group = new THREE.Group()
-  const geos = getOutlineGeometries()
+  const ringGeo = getOutlineRingGeometry()
 
-  // 1. เปลือกนอก Wireframe Outline ตามสีประจำตัวละคร
-  const wireframeMat = new THREE.MeshBasicMaterial({
+  const ringMat = new THREE.MeshBasicMaterial({
     color,
-    wireframe: true,
+    side: THREE.DoubleSide,
     transparent: true,
     opacity: 0.85,
-    depthTest: false,
+    depthTest: true,
     depthWrite: false,
   })
-  const wireframeMesh = new THREE.Mesh(geos.wireframe, wireframeMat)
-  wireframeMesh.name = "outline_wireframe"
-  wireframeMesh.position.y = 0.85
-  wireframeMesh.renderOrder = 992
-  group.add(wireframeMesh)
-
-  // 2. เปลือกใน Silhouette เรืองแสงโปร่งแสง ให้เห็นรูปทรงตัวละครชัดเจนแม้อยู่หลังกำแพง
-  const silhouetteMat = new THREE.MeshBasicMaterial({
-    color,
-    transparent: true,
-    opacity: 0.35,
-    depthTest: false,
-    depthWrite: false,
-  })
-  const silhouetteMesh = new THREE.Mesh(geos.silhouette, silhouetteMat)
-  silhouetteMesh.name = "outline_silhouette"
-  silhouetteMesh.position.y = 0.85
-  silhouetteMesh.renderOrder = 991
-  group.add(silhouetteMesh)
+  const ringMesh = new THREE.Mesh(ringGeo, ringMat)
+  ringMesh.name = "outline_ring"
+  ringMesh.rotation.x = -Math.PI / 2
+  ringMesh.position.y = -0.36
+  group.add(ringMesh)
 
   return group
 }
