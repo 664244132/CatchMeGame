@@ -1,12 +1,12 @@
-import { useState } from 'react';
-import type { GameStateSnapshot } from '../game/types';
-import { BOMB_START_TIME } from '../game/constants';
-import VirtualJoystick from './VirtualJoystick';
+import { useState } from "react"
+import type { GameStateSnapshot } from "../game/types"
+import { BOMB_START_TIME } from "../game/constants"
+import VirtualJoystick from "./VirtualJoystick"
 
 interface Props {
-  state: GameStateSnapshot;
-  round: number;
-  totalRounds: number;
+  state: GameStateSnapshot
+  round: number
+  totalRounds: number
 }
 
 /**
@@ -19,18 +19,18 @@ interface Props {
  * 4. Safe Area Insets: ปรับระยะเว้นขอบบน-ล่างให้พอดีกับติ่งกล้องและขอบจอมือถือ
  */
 export default function HUD({ state, round, totalRounds }: Props) {
-  const { players, bombTimer, message, dashCooldown, bombDistance } = state;
-  const [showPlayerList, setShowPlayerList] = useState(false);
+  const { players, bombTimer, message, dashCooldown, bombDistance } = state
+  const [showPlayerList, setShowPlayerList] = useState(false)
 
-  const alive = players.filter((p) => !p.isDead);
-  const cat = players.find((p) => p.isCat && !p.isDead);
-  const human = players.find((p) => p.isHuman);
-  const humanIsIt = human?.isCat && !human.isDead;
+  const alive = players.filter((p) => !p.isDead)
+  const cat = players.find((p) => p.isCat && !p.isDead)
+  const human = players.find((p) => p.isHuman)
+  const humanIsIt = human?.isCat && !human.isDead
 
   // คำนวณเปอร์เซ็นต์เวลาระเบิด (อ้างอิงจาก BOMB_START_TIME = 15.0 วินาที)
-  const timerPct = Math.max(0, bombTimer / BOMB_START_TIME);
-  const timerUrgent = bombTimer < 3.5;
-  const dashPct = Math.max(0, 1 - dashCooldown / 2);
+  const timerPct = Math.max(0, bombTimer / BOMB_START_TIME)
+  const timerUrgent = bombTimer < 3.5
+  const dashPct = Math.max(0, 1 - dashCooldown / 2)
 
   return (
     <div className="absolute inset-0 pointer-events-none select-none overflow-hidden">
@@ -44,7 +44,10 @@ export default function HUD({ state, round, totalRounds }: Props) {
             Round
           </div>
           <div className="text-white font-display text-base sm:text-xl leading-tight">
-            {round} <span className="text-white/40 text-xs sm:text-sm">/ {totalRounds}</span>
+            {round}{" "}
+            <span className="text-white/40 text-xs sm:text-sm">
+              / {totalRounds}
+            </span>
           </div>
         </div>
 
@@ -54,12 +57,16 @@ export default function HUD({ state, round, totalRounds }: Props) {
             <div
               className={`relative flex flex-col items-center px-3.5 py-1.5 sm:px-6 sm:py-2 rounded-2xl border transition-all duration-150 backdrop-blur-md shadow-xl ${
                 timerUrgent
-                  ? 'bg-red-600/85 border-red-400 shadow-[0_0_25px_rgba(255,60,0,0.8)] scale-102'
-                  : 'bg-black/60 border-white/20'
+                  ? "bg-red-600/85 border-red-400 shadow-[0_0_25px_rgba(255,60,0,0.8)] scale-102"
+                  : "bg-black/60 border-white/20"
               }`}
             >
               <div className="text-white/80 text-[10px] sm:text-xs font-semibold tracking-wider uppercase mb-0.5 truncate max-w-[210px] sm:max-w-none text-center flex items-center justify-center gap-1.5 flex-wrap">
-                <span>💣 <span className="text-yellow-300 font-bold">{cat.name}</span> has the bomb!</span>
+                <span>
+                  💣{" "}
+                  <span className="text-yellow-300 font-bold">{cat.name}</span>{" "}
+                  has the bomb!
+                </span>
                 {bombDistance !== undefined && !humanIsIt && (
                   <span className="bg-red-500/80 text-white text-[9px] sm:text-[10px] font-bold px-1.5 py-0.2 rounded-full border border-red-300/40 tracking-normal shadow-sm flex items-center gap-0.5 animate-pulse">
                     <span>📍</span>
@@ -75,7 +82,7 @@ export default function HUD({ state, round, totalRounds }: Props) {
 
               <div
                 className={`font-display text-2xl sm:text-4xl leading-none tabular-nums font-bold ${
-                  timerUrgent ? 'text-yellow-300 animate-pulse' : 'text-white'
+                  timerUrgent ? "text-yellow-300 animate-pulse" : "text-white"
                 }`}
               >
                 {Math.max(0, bombTimer).toFixed(1)}s
@@ -85,7 +92,7 @@ export default function HUD({ state, round, totalRounds }: Props) {
               <div className="mt-1.5 w-24 sm:w-44 h-1.5 sm:h-2 bg-white/20 rounded-full overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all duration-100 ${
-                    timerUrgent ? 'bg-yellow-400' : 'bg-emerald-400'
+                    timerUrgent ? "bg-yellow-400" : "bg-emerald-400"
                   }`}
                   style={{ width: `${timerPct * 100}%` }}
                 />
@@ -97,6 +104,8 @@ export default function HUD({ state, round, totalRounds }: Props) {
         {/* ปุ่มแสดงจำนวนผู้รอดชีวิต (กดเพื่อเปิดดูรายชื่อผู้เล่นทั้งหมดได้) */}
         <button
           type="button"
+          aria-label="แสดงรายชื่อผู้เล่นทั้งหมด"
+          aria-expanded={showPlayerList}
           onClick={() => setShowPlayerList(!showPlayerList)}
           className="pointer-events-auto bg-black/60 hover:bg-black/80 active:scale-95 transition-all backdrop-blur-md border border-white/20 rounded-2xl px-3 py-1.5 sm:px-4 sm:py-2 text-right shrink-0 shadow-lg cursor-pointer"
         >
@@ -105,7 +114,10 @@ export default function HUD({ state, round, totalRounds }: Props) {
             <span className="text-xs">👥</span>
           </div>
           <div className="text-emerald-400 font-display text-base sm:text-xl leading-tight">
-            {alive.length} <span className="text-white/40 text-xs sm:text-sm">/ {players.length}</span>
+            {alive.length}{" "}
+            <span className="text-white/40 text-xs sm:text-sm">
+              / {players.length}
+            </span>
           </div>
         </button>
       </div>
@@ -120,25 +132,29 @@ export default function HUD({ state, round, totalRounds }: Props) {
             key={p.id}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs backdrop-blur-sm transition-all ${
               p.isDead
-                ? 'opacity-40 bg-black/40 border-white/10 text-white/50'
+                ? "opacity-40 bg-black/40 border-white/10 text-white/50"
                 : p.isCat
-                ? 'bg-orange-600/80 border-orange-400 text-white shadow-[0_0_12px_rgba(255,100,0,0.5)]'
-                : p.isHuman
-                ? 'bg-blue-600/70 border-blue-400 text-white'
-                : 'bg-black/50 border-white/15 text-white'
+                  ? "bg-orange-600/80 border-orange-400 text-white shadow-[0_0_12px_rgba(255,100,0,0.5)]"
+                  : p.isHuman
+                    ? "bg-blue-600/70 border-blue-400 text-white"
+                    : "bg-black/50 border-white/15 text-white"
             }`}
           >
             <div
               className="w-2.5 h-2.5 rounded-full shrink-0"
-              style={{ backgroundColor: `#${p.color.toString(16).padStart(6, '0')}` }}
+              style={{
+                backgroundColor: `#${p.color.toString(16).padStart(6, "0")}`,
+              }}
             />
             <span className="font-medium truncate max-w-[100px]">
-              {p.isHuman ? '★ ' : ''}
+              {p.isHuman ? "★ " : ""}
               {p.name}
             </span>
             {p.isCat && !p.isDead && <span className="text-xs">💣</span>}
             {p.isDead && <span className="text-xs">💀</span>}
-            <span className="ml-auto pl-2 text-white/60 font-mono">{p.survivalCount}</span>
+            <span className="ml-auto pl-2 text-white/60 font-mono">
+              {p.survivalCount}
+            </span>
           </div>
         ))}
       </div>
@@ -153,8 +169,9 @@ export default function HUD({ state, round, totalRounds }: Props) {
               </div>
               <button
                 type="button"
+                aria-label="ปิดรายชื่อผู้เล่น"
                 onClick={() => setShowPlayerList(false)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm font-bold"
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm font-bold cursor-pointer"
               >
                 ✕
               </button>
@@ -166,26 +183,32 @@ export default function HUD({ state, round, totalRounds }: Props) {
                   key={p.id}
                   className={`flex items-center justify-between px-3 py-2 rounded-xl border text-sm ${
                     p.isDead
-                      ? 'opacity-40 bg-black/30 border-white/10 text-white/40'
+                      ? "opacity-40 bg-black/30 border-white/10 text-white/40"
                       : p.isCat
-                      ? 'bg-orange-500/20 border-orange-400 text-orange-200 font-bold'
-                      : 'bg-white/5 border-white/10 text-white'
+                        ? "bg-orange-500/20 border-orange-400 text-orange-200 font-bold"
+                        : "bg-white/5 border-white/10 text-white"
                   }`}
                 >
                   <div className="flex items-center gap-2">
                     <span
                       className="w-3 h-3 rounded-full shrink-0"
-                      style={{ backgroundColor: `#${p.color.toString(16).padStart(6, '0')}` }}
+                      style={{
+                        backgroundColor: `#${p.color.toString(16).padStart(6, "0")}`,
+                      }}
                     />
                     <span>
-                      {p.isHuman ? '★ ' : ''}
+                      {p.isHuman ? "★ " : ""}
                       {p.name}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 text-xs">
-                    {p.isCat && !p.isDead && <span className="text-orange-400">💣 IT</span>}
+                    {p.isCat && !p.isDead && (
+                      <span className="text-orange-400">💣 IT</span>
+                    )}
                     {p.isDead && <span className="text-red-400">💀 Dead</span>}
-                    {!p.isDead && !p.isCat && <span className="text-emerald-400">✓ Alive</span>}
+                    {!p.isDead && !p.isCat && (
+                      <span className="text-emerald-400">✓ Alive</span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -198,7 +221,11 @@ export default function HUD({ state, round, totalRounds }: Props) {
       {/* 3. YOU ARE IT BANNER (เตือนแบบกระชับไม่บังจอเมื่อถือระเบิด) */}
       {/* ────────────────────────────────────────────────────────────────── */}
       {humanIsIt && (
-        <div className={`absolute ${message ? 'top-26 sm:top-28' : 'top-18 sm:top-22'} left-0 right-0 flex justify-center px-4 z-20 pointer-events-none transition-all`}>
+        <div
+          className={`absolute ${
+            message ? "top-26 sm:top-28" : "top-18 sm:top-22"
+          } left-0 right-0 flex justify-center px-4 z-20 pointer-events-none transition-all`}
+        >
           <div className="bg-gradient-to-r from-orange-600 via-red-600 to-amber-600 border border-yellow-300 rounded-full px-4 py-1.5 sm:px-6 sm:py-2 shadow-[0_0_25px_rgba(255,80,0,0.7)] text-center animate-pulse">
             <span className="font-display text-white text-xs sm:text-sm drop-shadow">
               ⚡ YOU HAVE THE BOMB! TAG SOMEONE! 💥
@@ -241,7 +268,9 @@ export default function HUD({ state, round, totalRounds }: Props) {
           </div>
           <span className="text-[11px] font-bold">
             {dashCooldown > 0 ? (
-              <span className="text-orange-400">CD {dashCooldown.toFixed(1)}s</span>
+              <span className="text-orange-400">
+                CD {dashCooldown.toFixed(1)}s
+              </span>
             ) : (
               <span className="text-emerald-400">READY</span>
             )}
@@ -261,5 +290,5 @@ export default function HUD({ state, round, totalRounds }: Props) {
       {/* ────────────────────────────────────────────────────────────────── */}
       <VirtualJoystick dashCooldown={dashCooldown} />
     </div>
-  );
+  )
 }

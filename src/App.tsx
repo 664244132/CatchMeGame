@@ -1,88 +1,93 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
-import { GamePhase } from './game/types';
-import type { GameStateSnapshot, PlayerData, PlayerConfig } from './game/types';
-import type { GameEngine } from './game/GameEngine';
-import { NetworkManager } from './game/networkManager';
-import { BOMB_START_TIME } from './game/constants';
-import GameCanvas from './components/GameCanvas';
-import HUD from './components/HUD';
-import Lobby from './components/Lobby';
-import RoundEnd from './components/RoundEnd';
-import MatchSummary from './components/MatchSummary';
+import { useState, useRef, useCallback, useEffect } from "react"
+import { GamePhase } from "./game/types"
+import type { GameStateSnapshot, PlayerData, PlayerConfig } from "./game/types"
+import type { GameEngine } from "./game/GameEngine"
+import { NetworkManager } from "./game/networkManager"
+import { BOMB_START_TIME } from "./game/constants"
+import GameCanvas from "./components/GameCanvas"
+import HUD from "./components/HUD"
+import Lobby from "./components/Lobby"
+import RoundEnd from "./components/RoundEnd"
+import MatchSummary from "./components/MatchSummary"
+
+interface NextRoundEventPayload {
+  nextRound: number
+  catId: number
+}
 
 const INITIAL_STATE: GameStateSnapshot = {
   players: [],
   bombTimer: BOMB_START_TIME,
   bombHolderId: 0,
-  message: '',
+  message: "",
   roundActive: false,
   dashCooldown: 0,
-};
+}
 
 export default function App() {
-  const [phase, setPhase] = useState<GamePhase>(GamePhase.LOBBY);
-  const [totalRounds, setTotalRounds] = useState(5);
-  const [round, setRound] = useState(1);
-  const [gameState, setGameState] = useState<GameStateSnapshot>(INITIAL_STATE);
-  const [roundPlayers, setRoundPlayers] = useState<PlayerData[]>([]);
-  const [finalPlayers, setFinalPlayers] = useState<PlayerData[]>([]);
-  const [catId, setCatId] = useState(0);
+  const [phase, setPhase] = useState<GamePhase>(GamePhase.LOBBY)
+  const [totalRounds, setTotalRounds] = useState(5)
+  const [round, setRound] = useState(1)
+  const [gameState, setGameState] = useState<GameStateSnapshot>(INITIAL_STATE)
+  const [roundPlayers, setRoundPlayers] = useState<PlayerData[]>([])
+  const [finalPlayers, setFinalPlayers] = useState<PlayerData[]>([])
+  const [catId, setCatId] = useState(0)
 
   // ข้อมูลห้องและการเชื่อมต่อเน็ตเวิร์ก
-  const [playerConfigs, setPlayerConfigs] = useState<PlayerConfig[]>([]);
-  const [isHost, setIsHost] = useState(false);
-  const [localPlayerId, setLocalPlayerId] = useState(0);
+  const [playerConfigs, setPlayerConfigs] = useState<PlayerConfig[]>([])
+  const [isHost, setIsHost] = useState(false)
+  const [localPlayerId, setLocalPlayerId] = useState(0)
 
-  const engineRef = useRef<GameEngine | null>(null);
+  const engineRef = useRef<GameEngine | null>(null)
 
   // ดักฟังการสั่งเริ่มรอบถัดไปและผลสรุปจบรอบจาก Host ข้ามเน็ตเวิร์ก
   useEffect(() => {
-    const network = NetworkManager.getInstance();
-    const onNextRound = (payload: { nextRound: number; catId: number }) => {
-      setRound(payload.nextRound);
-      setCatId(payload.catId);
-      setPhase(GamePhase.ROUND_ACTIVE);
+    const network = NetworkManager.getInstance()
+    const onNextRound = (payload: NextRoundEventPayload) => {
+      setRound(payload.nextRound)
+      setCatId(payload.catId)
+      setPhase(GamePhase.ROUND_ACTIVE)
       setTimeout(() => {
-        engineRef.current?.startRound(payload.catId);
-      }, 60);
-    };
+        engineRef.current?.startRound(payload.catId)
+      }, 60)
+    }
 
     const onRoundEndNet = (payload: { players: PlayerData[] }) => {
-      setRoundPlayers(payload.players);
-      setPhase(GamePhase.ROUND_END);
-    };
+      setRoundPlayers(payload.players)
+      setPhase(GamePhase.ROUND_END)
+    }
 
     const onMatchOver = (payload: { players: PlayerData[] }) => {
-      setFinalPlayers(payload.players);
-      setPhase(GamePhase.MATCH_SUMMARY);
-    };
+      setFinalPlayers(payload.players)
+      setPhase(GamePhase.MATCH_SUMMARY)
+    }
 
     const onResetLobby = () => {
-      setRound(1);
-      setGameState(INITIAL_STATE);
-      setPhase(GamePhase.LOBBY);
-    };
+      setRound(1)
+      setGameState(INITIAL_STATE)
+      setPhase(GamePhase.LOBBY)
+    }
 
-    network.on('next_round', onNextRound);
-    network.on('round_end', onRoundEndNet);
-    network.on('match_over', onMatchOver);
-    network.on('reset_lobby', onResetLobby);
+    network.on("next_round", onNextRound)
+    network.on("round_end", onRoundEndNet)
+    network.on("match_over", onMatchOver)
+    network.on("reset_lobby", onResetLobby)
     return () => {
-      network.off('next_round', onNextRound);
-      network.off('round_end', onRoundEndNet);
-      network.off('match_over', onMatchOver);
-      network.off('reset_lobby', onResetLobby);
-    };
-  }, []);
+      network.off("next_round", onNextRound)
+      network.off("round_end", onRoundEndNet)
+      network.off("match_over", onMatchOver)
+      network.off("reset_lobby", onResetLobby)
+    }
+  }, [])
 
   const handleStateUpdate = useCallback((s: GameStateSnapshot) => {
-    setGameState(s);
-  }, []);
+    setGameState(s)
+  }, [])
 
   const handleRoundEnd = useCallback((players: PlayerData[]) => {
-    setRoundPlayers(players);
-    setPhase(GamePhase.ROUND_END);
-  }, []);
+    setRoundPlayers(players)
+    setPhase(GamePhase.ROUND_END)
+  }, [])
 
   // เริ่มต้นเกมจากหน้า Lobby (ทั้งฝั่ง Host และ Guest)
   const handleStartGame = (
@@ -92,48 +97,50 @@ export default function App() {
     hostFlag: boolean,
     localId: number,
   ) => {
-    setTotalRounds(rounds);
-    setRound(1);
-    setPlayerConfigs(configs);
-    setCatId(initialCatId);
-    setIsHost(hostFlag);
-    setLocalPlayerId(localId);
-    setPhase(GamePhase.ROUND_ACTIVE);
-  };
+    setTotalRounds(rounds)
+    setRound(1)
+    setPlayerConfigs(configs)
+    setCatId(initialCatId)
+    setIsHost(hostFlag)
+    setLocalPlayerId(localId)
+    setPhase(GamePhase.ROUND_ACTIVE)
+  }
 
   const handleNextRound = () => {
     if (round >= totalRounds) {
-      setFinalPlayers(roundPlayers);
-      setPhase(GamePhase.MATCH_SUMMARY);
+      setFinalPlayers(roundPlayers)
+      setPhase(GamePhase.MATCH_SUMMARY)
       if (isHost) {
-        NetworkManager.getInstance().sendMessage('MATCH_OVER', { players: roundPlayers });
+        NetworkManager.getInstance().sendMessage("MATCH_OVER", {
+          players: roundPlayers,
+        })
       }
     } else {
-      const nextRound = round + 1;
-      setRound(nextRound);
+      const nextRound = round + 1
+      setRound(nextRound)
 
       // หากเป็น Host ให้ส่งสัญญาณเปลี่ยนรอบไปยังผู้เล่นคนอื่น
-      let newCatId = Math.floor(Math.random() * playerConfigs.length);
+      let newCatId = Math.floor(Math.random() * playerConfigs.length)
       if (isHost) {
-        newCatId = NetworkManager.getInstance().hostNextRound(nextRound);
+        newCatId = NetworkManager.getInstance().hostNextRound(nextRound)
       }
 
-      setCatId(newCatId);
-      setPhase(GamePhase.ROUND_ACTIVE);
+      setCatId(newCatId)
+      setPhase(GamePhase.ROUND_ACTIVE)
       setTimeout(() => {
-        engineRef.current?.startRound(newCatId);
-      }, 60);
+        engineRef.current?.startRound(newCatId)
+      }, 60)
     }
-  };
+  }
 
   const handlePlayAgain = () => {
     if (isHost) {
-      NetworkManager.getInstance().sendMessage('RESET_LOBBY', {});
+      NetworkManager.getInstance().sendMessage("RESET_LOBBY", {})
     }
-    setRound(1);
-    setGameState(INITIAL_STATE);
-    setPhase(GamePhase.LOBBY);
-  };
+    setRound(1)
+    setGameState(INITIAL_STATE)
+    setPhase(GamePhase.LOBBY)
+  }
 
   return (
     <div className="relative w-full h-dvh overflow-hidden bg-black select-none">
@@ -141,7 +148,9 @@ export default function App() {
       {phase !== GamePhase.LOBBY && phase !== GamePhase.MATCH_SUMMARY && (
         <div
           className={`absolute inset-0 ${
-            phase !== GamePhase.ROUND_ACTIVE ? 'opacity-30 pointer-events-none' : ''
+            phase !== GamePhase.ROUND_ACTIVE
+              ? "opacity-30 pointer-events-none"
+              : ""
           }`}
         >
           <GameCanvas
@@ -182,5 +191,5 @@ export default function App() {
         />
       )}
     </div>
-  );
+  )
 }

@@ -23,10 +23,41 @@
 | **13** | ปรับปรุง UI แจ้งเตือน (ย้ายขึ้นด้านบน ขนาดกะทัดรัดไม่บังจอ 3D) และปรับตำแหน่งปุ่มควบคุมบนมือถือยกสูงพ้นขอบล่างจอ (Mobile Controls Ergonomics) | สำเร็จ |
 | **14** | เพิ่มระบบระบุตำแหน่งผู้เล่น (Locator System): เสาแสง Sky Beacon 35m, ป้ายชื่อ 3D ลอยเหนือหัว, Outline & Silhouette ทะลุกำแพงหลากสีตามตัวละคร และ Distance Tracker บน HUD | สำเร็จ |
 | **15** | แก้ไขคำเตือน Config & Canonical Classes: กำจัด `baseUrl` ที่ deprecated ใน `tsconfig.json` และปรับคลาส `h-[100dvh]` เป็น `h-dvh` ตามมาตรฐาน Tailwind CSS | สำเร็จ |
+| **16** | ตรวจสอบและ Refactor โค้ดทั่วทั้งโครงสร้าง: กำจัด `any` 100%, แก้ไข Semantic Form Labels (`htmlFor`/`id`), เพิ่ม ARIA labels (`a11y`), ปรับ Stable Keys, แก้ไข Interface Message Types, และจัดระเบียบโค้ดด้วย `oxfmt` | สำเร็จ |
 
 ---
 
 ## 🚀 ประวัติการปรับปรุงรอบปัจจุบัน (Current Active Session)
+
+### 🔹 การตรวจสอบและ Refactor โค้ดทั่วทั้งโครงสร้างตามกฎ Markdown Guides (Milestone 16)
+- **[.figma/make/site.json](file:///C:/Users/k2pwm/Downloads/CatchMeGame/.figma/make/site.json):**
+  - เพิ่ม `"title": "CatchMeGame - 3D Multiplayer Hot Potato"` และ `"language": "th"` ตามมาตรฐาน `HTMLCodingGuide.md` (ข้อ 1: Metadata & Document Title)
+- **[src/game/constants.ts](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/game/constants.ts):**
+  - นำ Unused Type Import (`PlayerConfig`) ออกจากโค้ด
+- **[src/game/types.ts](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/game/types.ts):**
+  - Refactor `NetworkMessage` จาก Anonymous Union Types รวบตัวแปร เป็น Interface แยกประเภทอย่างชัดเจน (`JoinRoomMessage`, `JoinRoomAckMessage`, `PlayerJoinedMessage` ฯลฯ) ป้องกัน Bug การจัดรูปแบบโค้ด และสอดคล้องกับหลัก Interface-Based Programming ใน `REFACTORCODE.md` ข้อ 3
+- **[src/game/networkManager.ts](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/game/networkManager.ts):**
+  - กำจัด `any` ทั้งหมด 100%: ปรับ `private listeners` เป็น `Map<string, Set<NetworkEventCallback<unknown>>>`
+  - ปรับ Generic Defaults ใน `on<T = unknown>`, `off<T = unknown>`, `emit<T = unknown>` ให้เป็น `unknown` ที่ปลอดภัย
+  - ปรับ Event Error Listener ของทั้ง Host และ Guest เป็น `(err: unknown)` พร้อมทำ Type Guard / Narrowing `peerError?.type === 'peer-unavailable'`
+- **[src/App.tsx](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/App.tsx):**
+  - ประกาศ `interface NextRoundEventPayload` ป้องกันปัญหา Semicolon Parsing และเพิ่ม Type Safety ชัดเจน
+- **[src/components/Lobby.tsx](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/components/Lobby.tsx):**
+  - ปรับ `catch (err: any)` เป็น `catch (err: unknown)` พร้อม Narrowing `err instanceof Error`
+  - ผูก `htmlFor` และ `id` ระหว่าง `<label>` กับ `<input>` (ชื่อผู้เล่น และ รหัสห้อง) ตามมาตรฐาน `HTMLCodingGuide.md` (ข้อ 6)
+  - ปรับ List Key ของ Floating Particles เป็น Stable Key (`floating-emoji-${i}`) ตามมาตรฐาน `REACTCodingGuide.md` (ข้อ 2)
+  - ลบตัวแปร `index` ที่ไม่ได้ใช้งานในลูปแสดงรายชื่อผู้เล่น
+- **[src/components/HUD.tsx](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/components/HUD.tsx):**
+  - เพิ่ม `aria-label="แสดงรายชื่อผู้เล่นทั้งหมด"` และ `aria-expanded={showPlayerList}` ให้กับปุ่ม Alive
+  - เพิ่ม `aria-label="ปิดรายชื่อผู้เล่น"` ให้กับปุ่มปิด Drawer ตามมาตรฐาน `HTMLCodingGuide.md` (ข้อ 10) และ `TailwindCodingGuide.md` (ข้อ 9)
+- **[src/components/VirtualJoystick.tsx](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/components/VirtualJoystick.tsx):**
+  - เพิ่ม `aria-label="Dash พุ่งตัว"` และ `aria-label="Jump กระโดด"` ให้กับปุ่มสัมผัสบนมือถือ
+- **[src/components/RoundEnd.tsx](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/components/RoundEnd.tsx):**
+  - เพิ่มแอตทริบิวต์ `type="button"` ให้กับปุ่ม Next Round
+- **[src/components/MatchSummary.tsx](file:///C:/Users/k2pwm/Downloads/CatchMeGame/src/components/MatchSummary.tsx):**
+  - เพิ่ม `type="button"` ให้กับปุ่ม Play Again และปรับ List Key ของ Confetti เป็น Stable Key (`confetti-${i}`)
+- **Code Formatter (oxfmt):**
+  - จัดระเบียบโค้ดทั้ง 15 ไฟล์ในโปรเจกต์ด้วย `oxfmt` ผ่านการตรวจสอบ `oxfmt --check` สะอาด 100%
 
 ### 🔹 การแก้ไขคำเตือน Deprecated baseUrl และ Tailwind Canonical Classes (Milestone 15)
 - **[tsconfig.json](file:///C:/Users/k2pwm/Downloads/CatchMeGame/tsconfig.json):**

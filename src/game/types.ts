@@ -1,116 +1,116 @@
-import type * as THREE from 'three';
+import type * as THREE from "three"
 
 /**
  * สถานะของเกมในแต่ละช่วง (Game Phase)
  */
 export enum GamePhase {
-  LOBBY = 'LOBBY',
-  ROUND_ACTIVE = 'ROUND_ACTIVE',
-  ROUND_END = 'ROUND_END',
-  MATCH_SUMMARY = 'MATCH_SUMMARY',
+  LOBBY = "LOBBY",
+  ROUND_ACTIVE = "ROUND_ACTIVE",
+  ROUND_END = "ROUND_END",
+  MATCH_SUMMARY = "MATCH_SUMMARY",
 }
 
 /**
  * บทบาทในระบบเน็ตเวิร์ก (Network Role)
  */
-export type NetworkRole = 'HOST' | 'CLIENT';
+export type NetworkRole = "HOST" | "CLIENT"
 
 /**
  * ข้อมูลผู้เล่นที่อยู่ในห้องพักคอย (Lobby Player)
  */
 export interface LobbyPlayer {
-  id: number;
-  name: string;
-  isHost: boolean;
-  color: number;
-  clientToken?: string;
+  id: number
+  name: string
+  isHost: boolean
+  color: number
+  clientToken?: string
 }
 
 /**
  * ข้อมูลรายการห้องที่เปิดอยู่สำหรับค้นหาข้ามแท็บ (Room Registry Storage Item)
  */
 export interface RoomRegistryItem {
-  code: string;
-  hostName: string;
-  hostId: number;
-  players: LobbyPlayer[];
-  status: 'WAITING' | 'PLAYING';
-  totalRounds: number;
-  updatedAt: number;
+  code: string
+  hostName: string
+  hostId: number
+  players: LobbyPlayer[]
+  status: "WAITING" | "PLAYING"
+  totalRounds: number
+  updatedAt: number
 }
 
 /**
  * ข้อมูลสถานะของห้องเล่นเกม (Room State)
  */
 export interface RoomState {
-  roomCode: string;
-  hostId: number;
-  players: LobbyPlayer[];
-  totalRounds: number;
+  roomCode: string
+  hostId: number
+  players: LobbyPlayer[]
+  totalRounds: number
 }
 
 /**
  * ข้อมูลของผู้เล่นแต่ละคน (สำหรับแสดงผล UI และจัดเก็บสถิติ)
  */
 export interface PlayerData {
-  id: number;
-  name: string;
-  isHuman: boolean;
-  isCat: boolean;
-  isDead: boolean;
-  survivalCount: number;
-  bombsDeflected: number;
-  color: number;
+  id: number
+  name: string
+  isHuman: boolean
+  isCat: boolean
+  isDead: boolean
+  survivalCount: number
+  bombsDeflected: number
+  color: number
 }
 
 /**
  * ภาพรวมสถานะเกมล่าสุดที่ส่งไปอัปเดตให้ฝั่ง React Component (State Snapshot)
  */
 export interface GameStateSnapshot {
-  players: PlayerData[];
-  bombTimer: number;
-  bombHolderId: number;
-  message: string;
-  roundActive: boolean;
-  dashCooldown: number;
-  bombDistance?: number; // ระยะห่างจากคนถือระเบิด (เมตร) สำหรับแสดงผลบน HUD
+  players: PlayerData[]
+  bombTimer: number
+  bombHolderId: number
+  message: string
+  roundActive: boolean
+  dashCooldown: number
+  bombDistance?: number // ระยะห่างจากคนถือระเบิด (เมตร) สำหรับแสดงผลบน HUD
 }
 
 /**
  * โครงสร้างฟิสิกส์สำหรับการเคลื่อนที่ของตัวละคร
  */
 export interface PhysicsBody {
-  position: THREE.Vector3;
-  velocity: THREE.Vector3;
-  isGrounded: boolean;
+  position: THREE.Vector3
+  velocity: THREE.Vector3
+  isGrounded: boolean
 }
 
 /**
  * เอนทิตีตัวละครภายใน GameEngine (สำหรับผู้เล่นคนจริง ไม่ใช้ AI)
  */
 export interface PlayerEntity {
-  id: number;
-  name: string;
-  isHuman: boolean;
-  data: PlayerData;
-  body: PhysicsBody;
-  mesh: THREE.Group;
-  bombIndicator: THREE.Group;
-  outlineMesh: THREE.Group; // Outline / Silhouette แสดงทะลุกำแพงตามสีประจำตัวละคร
-  nameplate: THREE.Sprite; // ป้ายชื่อ 3D ลอยเหนือหัวผู้เล่น มองเห็นทะลุกำแพง
-  dashTimer: number;
-  dashCooldown: number;
-  isDashing: boolean;
-  dashDir: THREE.Vector3;
-  keys: Set<string>; // คีย์บอร์ดอินพุตของผู้เล่นคนนี้ (ส่งผ่านเน็ตเวิร์กหรือกดเอง)
+  id: number
+  name: string
+  isHuman: boolean
+  data: PlayerData
+  body: PhysicsBody
+  mesh: THREE.Group
+  bombIndicator: THREE.Group
+  outlineMesh: THREE.Group // Outline / Silhouette แสดงทะลุกำแพงตามสีประจำตัวละคร
+  nameplate: THREE.Sprite // ป้ายชื่อ 3D ลอยเหนือหัวผู้เล่น มองเห็นทะลุกำแพง
+  dashTimer: number
+  dashCooldown: number
+  isDashing: boolean
+  dashDir: THREE.Vector3
+  keys: Set<string> // คีย์บอร์ดอินพุตของผู้เล่นคนนี้ (ส่งผ่านเน็ตเวิร์กหรือกดเอง)
 }
 
 /**
  * ข้อมูลแพลตฟอร์มสิ่งกีดขวางในฉาก
  */
 export interface Platform {
-  position: THREE.Vector3;
-  halfSize: THREE.Vector3;
+  position: THREE.Vector3
+  halfSize: THREE.Vector3
 }
 
 /**
@@ -118,132 +118,176 @@ export interface Platform {
  * Zero-GC: ใช้ Float32Array จัดเก็บความเร็ว (vx, vy, vz) แทน Vector3[] เพื่อลดภาระ Garbage Collection
  */
 export interface ExplosionParticle {
-  points: THREE.Points;
-  velocities: Float32Array;
-  life: number;
-  maxLife: number;
+  points: THREE.Points
+  velocities: Float32Array
+  life: number
+  maxLife: number
 }
 
 /**
  * คอนฟิกเริ่มต้นสำหรับผู้เล่นแต่ละคน
  */
 export interface PlayerConfig {
-  id: number;
-  name: string;
-  isHuman: boolean;
-  color: number;
+  id: number
+  name: string
+  isHuman: boolean
+  color: number
 }
 
 // ─── Network Messaging Types (Discriminated Unions) ───────────────────────────
 
-export type NetworkMessageType =
-  | 'JOIN_ROOM'
-  | 'JOIN_ROOM_ACK'
-  | 'PLAYER_JOINED'
-  | 'PLAYER_LEFT'
-  | 'START_GAME'
-  | 'PLAYER_INPUT'
-  | 'SYNC_STATE'
-  | 'ROUND_END'
-  | 'NEXT_ROUND'
-  | 'MATCH_OVER'
-  | 'RESET_LOBBY';
+export type NetworkMessageType = "JOIN_ROOM" | "JOIN_ROOM_ACK" | "PLAYER_JOINED" | "PLAYER_LEFT" | "START_GAME" | "PLAYER_INPUT" | "SYNC_STATE" | "ROUND_END" | "NEXT_ROUND" | "MATCH_OVER" | "RESET_LOBBY"
 
 /**
  * ข้อมูลตำแหน่งและสถานะของผู้เล่นที่ซิงค์ผ่านเน็ตเวิร์ก
  */
 export interface SyncedPlayerState {
-  id: number;
-  x: number;
-  y: number;
-  z: number;
-  rotY: number;
-  isCat: boolean;
-  isDead: boolean;
-  survivalCount: number;
-  bombsDeflected: number;
-  dashCooldown: number;
+  id: number
+  x: number
+  y: number
+  z: number
+  rotY: number
+  isCat: boolean
+  isDead: boolean
+  survivalCount: number
+  bombsDeflected: number
+  dashCooldown: number
 }
 
 export interface JoinRoomPayload {
-  player?: LobbyPlayer;
-  name: string;
-  requestedId?: number;
-  clientToken: string;
+  player?: LobbyPlayer
+  name: string
+  requestedId?: number
+  clientToken: string
 }
 
 export interface JoinRoomAckPayload {
-  success: boolean;
-  message?: string;
-  clientToken: string;
-  assignedId: number;
-  players: LobbyPlayer[];
-  totalRounds?: number;
-  isGameRunning?: boolean;
+  success: boolean
+  message?: string
+  clientToken: string
+  assignedId: number
+  players: LobbyPlayer[]
+  totalRounds?: number
+  isGameRunning?: boolean
 }
 
 export interface PlayerJoinedPayload {
-  player?: LobbyPlayer;
-  players: LobbyPlayer[];
-  assignedId?: number;
-  clientToken?: string;
+  player?: LobbyPlayer
+  players: LobbyPlayer[]
+  assignedId?: number
+  clientToken?: string
 }
 
 export interface PlayerLeftPayload {
-  playerId: number;
-  players?: LobbyPlayer[];
+  playerId: number
+  players?: LobbyPlayer[]
 }
 
 export interface StartGamePayload {
-  totalRounds: number;
-  catId: number;
-  playerConfigs: PlayerConfig[];
-  initialCatId?: number;
+  totalRounds: number
+  catId: number
+  playerConfigs: PlayerConfig[]
+  initialCatId?: number
 }
 
 export interface PlayerInputPayload {
-  playerId: number;
-  keys: string[];
+  playerId: number
+  keys: string[]
 }
 
 export interface SyncStatePayload {
-  bombTimer: number;
-  bombHolderId: number;
-  message: string;
-  roundActive: boolean;
-  players: SyncedPlayerState[];
+  bombTimer: number
+  bombHolderId: number
+  message: string
+  roundActive: boolean
+  players: SyncedPlayerState[]
 }
 
 export interface RoundEndPayload {
-  players: PlayerData[];
+  players: PlayerData[]
 }
 
 export interface NextRoundPayload {
-  nextRound?: number;
-  roundNumber?: number;
-  catId?: number;
-  initialCatId?: number;
+  nextRound?: number
+  roundNumber?: number
+  catId?: number
+  initialCatId?: number
 }
 
 export interface MatchOverPayload {
-  players?: PlayerData[];
-  results?: PlayerData[];
+  players?: PlayerData[]
+  results?: PlayerData[]
 }
 
-export type ResetLobbyPayload = Record<string, never>;
+export type ResetLobbyPayload = Record<string, never>
 
 /**
  * Discriminated Union สำหรับ Network Message ทั้งหมด
  */
-export type NetworkMessage =
-  | { type: 'JOIN_ROOM'; senderId: number; payload: JoinRoomPayload }
-  | { type: 'JOIN_ROOM_ACK'; senderId: number; payload: JoinRoomAckPayload }
-  | { type: 'PLAYER_JOINED'; senderId: number; payload: PlayerJoinedPayload }
-  | { type: 'PLAYER_LEFT'; senderId: number; payload: PlayerLeftPayload }
-  | { type: 'START_GAME'; senderId: number; payload: StartGamePayload }
-  | { type: 'PLAYER_INPUT'; senderId: number; payload: PlayerInputPayload }
-  | { type: 'SYNC_STATE'; senderId: number; payload: SyncStatePayload }
-  | { type: 'ROUND_END'; senderId: number; payload: RoundEndPayload }
-  | { type: 'NEXT_ROUND'; senderId: number; payload: NextRoundPayload }
-  | { type: 'MATCH_OVER'; senderId: number; payload: MatchOverPayload }
-  | { type: 'RESET_LOBBY'; senderId: number; payload: ResetLobbyPayload };
+export interface JoinRoomMessage {
+  type: "JOIN_ROOM"
+  senderId: number
+  payload: JoinRoomPayload
+}
+
+export interface JoinRoomAckMessage {
+  type: "JOIN_ROOM_ACK"
+  senderId: number
+  payload: JoinRoomAckPayload
+}
+
+export interface PlayerJoinedMessage {
+  type: "PLAYER_JOINED"
+  senderId: number
+  payload: PlayerJoinedPayload
+}
+
+export interface PlayerLeftMessage {
+  type: "PLAYER_LEFT"
+  senderId: number
+  payload: PlayerLeftPayload
+}
+
+export interface StartGameMessage {
+  type: "START_GAME"
+  senderId: number
+  payload: StartGamePayload
+}
+
+export interface PlayerInputMessage {
+  type: "PLAYER_INPUT"
+  senderId: number
+  payload: PlayerInputPayload
+}
+
+export interface SyncStateMessage {
+  type: "SYNC_STATE"
+  senderId: number
+  payload: SyncStatePayload
+}
+
+export interface RoundEndMessage {
+  type: "ROUND_END"
+  senderId: number
+  payload: RoundEndPayload
+}
+
+export interface NextRoundMessage {
+  type: "NEXT_ROUND"
+  senderId: number
+  payload: NextRoundPayload
+}
+
+export interface MatchOverMessage {
+  type: "MATCH_OVER"
+  senderId: number
+  payload: MatchOverPayload
+}
+
+export interface ResetLobbyMessage {
+  type: "RESET_LOBBY"
+  senderId: number
+  payload: ResetLobbyPayload
+}
+
+export type NetworkMessage = JoinRoomMessage | JoinRoomAckMessage | PlayerJoinedMessage | PlayerLeftMessage | StartGameMessage | PlayerInputMessage | SyncStateMessage | RoundEndMessage | NextRoundMessage | MatchOverMessage | ResetLobbyMessage

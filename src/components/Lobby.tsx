@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { NetworkManager, normalizeRoomCode } from '../game/networkManager';
-import type { LobbyPlayer, PlayerConfig } from '../game/types';
+import { useState, useEffect } from "react"
+import { NetworkManager, normalizeRoomCode } from "../game/networkManager"
+import type { LobbyPlayer, PlayerConfig } from "../game/types"
 
 interface Props {
   onStartGame: (
@@ -9,144 +9,161 @@ interface Props {
     catId: number,
     isHost: boolean,
     localPlayerId: number,
-  ) => void;
+  ) => void
 }
 
-type LobbyView = 'MAIN' | 'JOIN' | 'WAITING';
+type LobbyView = "MAIN" | "JOIN" | "WAITING"
 
 export default function Lobby({ onStartGame }: Props) {
-  const [view, setView] = useState<LobbyView>('MAIN');
-  const [playerName, setPlayerName] = useState(() => `Player ${Math.floor(Math.random() * 90 + 10)}`);
-  const [roomCodeInput, setRoomCodeInput] = useState('');
-  const [totalRounds, setTotalRounds] = useState(5);
-  const [players, setPlayers] = useState<LobbyPlayer[]>([]);
-  const [roomCode, setRoomCode] = useState('');
-  const [isHost, setIsHost] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [connectStatusText, setConnectStatusText] = useState('');
+  const [view, setView] = useState<LobbyView>("MAIN")
+  const [playerName, setPlayerName] = useState(
+    () => `Player ${Math.floor(Math.random() * 90 + 10)}`,
+  )
+  const [roomCodeInput, setRoomCodeInput] = useState("")
+  const [totalRounds, setTotalRounds] = useState(5)
+  const [players, setPlayers] = useState<LobbyPlayer[]>([])
+  const [roomCode, setRoomCode] = useState("")
+  const [isHost, setIsHost] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [errorMsg, setErrorMsg] = useState("")
+  const [isConnecting, setIsConnecting] = useState(false)
+  const [connectStatusText, setConnectStatusText] = useState("")
 
-  const network = NetworkManager.getInstance();
+  const network = NetworkManager.getInstance()
 
   useEffect(() => {
     // ดักฟังการอัปเดตสมาชิกในห้อง
     const onLobbyUpdated = (updatedPlayers: LobbyPlayer[]) => {
-      setPlayers(updatedPlayers);
-    };
+      setPlayers(updatedPlayers)
+    }
 
     // ดักฟังเมื่อ Host สั่งเริ่มเกม (สำหรับฝั่ง Guest)
     const onGameStarted = (payload: {
-      totalRounds: number;
-      catId: number;
-      playerConfigs: PlayerConfig[];
+      totalRounds: number
+      catId: number
+      playerConfigs: PlayerConfig[]
     }) => {
-      const localId = network.localPlayer?.id ?? 0;
-      onStartGame(payload.totalRounds, payload.playerConfigs, payload.catId, false, localId);
-    };
+      const localId = network.localPlayer?.id ?? 0
+      onStartGame(
+        payload.totalRounds,
+        payload.playerConfigs,
+        payload.catId,
+        false,
+        localId,
+      )
+    }
 
     // ดักฟังการยืนยันเข้าห้องสำเร็จ (ACK)
-    const onJoinSuccess = (payload: { players: LobbyPlayer[]; roomCode: string }) => {
-      setIsConnecting(false);
-      setRoomCode(payload.roomCode);
-      setPlayers(payload.players);
-      setView('WAITING');
-      setErrorMsg('');
-    };
+    const onJoinSuccess = (payload: {
+      players: LobbyPlayer[]
+      roomCode: string
+    }) => {
+      setIsConnecting(false)
+      setRoomCode(payload.roomCode)
+      setPlayers(payload.players)
+      setView("WAITING")
+      setErrorMsg("")
+    }
 
     // ดักฟังกรณีเข้าห้องไม่สำเร็จ / หาห้องไม่พบ (Timeout or Not Found)
     const onJoinFailed = (payload: { reason: string }) => {
-      setIsConnecting(false);
-      setErrorMsg(payload.reason || 'ไม่พบห้อง หรือไม่สามารถเชื่อมต่อได้');
-    };
+      setIsConnecting(false)
+      setErrorMsg(payload.reason || "ไม่พบห้อง หรือไม่สามารถเชื่อมต่อได้")
+    }
 
     // ดักฟังสถานะระหว่างการเชื่อมต่อ
     const onJoinStatus = (payload: { message: string }) => {
-      setConnectStatusText(payload.message);
-    };
+      setConnectStatusText(payload.message)
+    }
 
-    network.on('lobby_updated', onLobbyUpdated);
-    network.on('game_started', onGameStarted);
-    network.on('join_success', onJoinSuccess);
-    network.on('join_failed', onJoinFailed);
-    network.on('join_status', onJoinStatus);
+    network.on("lobby_updated", onLobbyUpdated)
+    network.on("game_started", onGameStarted)
+    network.on("join_success", onJoinSuccess)
+    network.on("join_failed", onJoinFailed)
+    network.on("join_status", onJoinStatus)
 
     return () => {
-      network.off('lobby_updated', onLobbyUpdated);
-      network.off('game_started', onGameStarted);
-      network.off('join_success', onJoinSuccess);
-      network.off('join_failed', onJoinFailed);
-      network.off('join_status', onJoinStatus);
-    };
-  }, [network, onStartGame]);
+      network.off("lobby_updated", onLobbyUpdated)
+      network.off("game_started", onGameStarted)
+      network.off("join_success", onJoinSuccess)
+      network.off("join_failed", onJoinFailed)
+      network.off("join_status", onJoinStatus)
+    }
+  }, [network, onStartGame])
 
   // ─── 1. สร้างห้องใหม่ (Create Room as Host) ───────────────────────────────
   const handleCreateRoom = () => {
-    const name = playerName.trim() || 'Host Player';
-    const code = network.createRoom(name);
-    setRoomCode(code);
-    setIsHost(true);
-    setPlayers(network.players);
-    setView('WAITING');
-    setErrorMsg('');
-  };
+    const name = playerName.trim() || "Host Player"
+    const code = network.createRoom(name)
+    setRoomCode(code)
+    setIsHost(true)
+    setPlayers(network.players)
+    setView("WAITING")
+    setErrorMsg("")
+  }
 
   // ─── 2. เข้าร่วมห้องด้วยรหัส (Join Room as Guest) ───────────────────────────
   const handleJoinRoom = () => {
-    const code = normalizeRoomCode(roomCodeInput);
+    const code = normalizeRoomCode(roomCodeInput)
     if (!code) {
-      setErrorMsg('กรุณากรอกรหัสห้อง (Room Code 4 หลัก เช่น A8F2)');
-      return;
+      setErrorMsg("กรุณากรอกรหัสห้อง (Room Code 4 หลัก เช่น A8F2)")
+      return
     }
 
-    const name = playerName.trim() || 'Guest Player';
-    setIsConnecting(true);
-    setConnectStatusText('กำลังค้นหาและเชื่อมต่อสัญญาณกับโฮสต์...');
-    setErrorMsg('');
-    setIsHost(false);
-    network.joinRoom(code, name);
-  };
+    const name = playerName.trim() || "Guest Player"
+    setIsConnecting(true)
+    setConnectStatusText("กำลังค้นหาและเชื่อมต่อสัญญาณกับโฮสต์...")
+    setErrorMsg("")
+    setIsHost(false)
+    network.joinRoom(code, name)
+  }
 
   // ─── 3. Host กดเริ่มเกม (Start Game) ──────────────────────────────────────
   const handleHostStart = () => {
-    if (!isHost) return;
+    if (!isHost) return
     try {
-      const { catId, playerConfigs } = network.hostStartGame(totalRounds);
-      const localId = network.localPlayer?.id ?? 0;
-      onStartGame(totalRounds, playerConfigs, catId, true, localId);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'ไม่สามารถเริ่มเกมได้');
+      const { catId, playerConfigs } = network.hostStartGame(totalRounds)
+      const localId = network.localPlayer?.id ?? 0
+      onStartGame(totalRounds, playerConfigs, catId, true, localId)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "ไม่สามารถเริ่มเกมได้"
+      setErrorMsg(message)
     }
-  };
+  }
 
   // ─── 4. เล่นด่วน 2 คน (Quick Match) ───────────────────────────────────────
   const handleQuickMatch = () => {
     const configs: PlayerConfig[] = [
-      { id: 0, name: playerName.trim() || 'You', isHuman: true, color: 0x74b9ff },
-      { id: 1, name: 'Player 2', isHuman: true, color: 0xff7675 },
-    ];
-    const initialCat = Math.floor(Math.random() * 2);
-    onStartGame(totalRounds, configs, initialCat, true, 0);
-  };
+      {
+        id: 0,
+        name: playerName.trim() || "You",
+        isHuman: true,
+        color: 0x74b9ff,
+      },
+      { id: 1, name: "Player 2", isHuman: true, color: 0xff7675 },
+    ]
+    const initialCat = Math.floor(Math.random() * 2)
+    onStartGame(totalRounds, configs, initialCat, true, 0)
+  }
 
   // ─── 5. คัดลอกรหัสห้อง ────────────────────────────────────────────────────
   const handleCopyCode = () => {
-    if (!roomCode) return;
-    navigator.clipboard.writeText(roomCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+    if (!roomCode) return
+    navigator.clipboard.writeText(roomCode)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   // ─── 6. ออกจากห้อง ────────────────────────────────────────────────────────
   const handleLeaveRoom = () => {
-    network.leaveRoom();
-    setIsConnecting(false);
-    setView('MAIN');
-    setRoomCode('');
-    setPlayers([]);
-    setIsHost(false);
-    setErrorMsg('');
-  };
+    network.leaveRoom()
+    setIsConnecting(false)
+    setView("MAIN")
+    setRoomCode("")
+    setPlayers([])
+    setIsHost(false)
+    setErrorMsg("")
+  }
 
   return (
     <div className="lobby-bg min-h-screen w-full flex flex-col items-center justify-start sm:justify-center p-3 sm:p-6 overflow-y-auto custom-scrollbar relative">
@@ -154,7 +171,7 @@ export default function Lobby({ onStartGame }: Props) {
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {Array.from({ length: 16 }).map((_, i) => (
           <div
-            key={i}
+            key={`floating-emoji-${i}`}
             className="absolute text-3xl sm:text-4xl"
             style={{
               left: `${(i * 19 + 7) % 100}%`,
@@ -165,7 +182,7 @@ export default function Lobby({ onStartGame }: Props) {
               fontSize: `${1.2 + (i % 4) * 0.4}rem`,
             }}
           >
-            {['💣', '⚡', '🐱', '🐭', '✨', '💥'][i % 6]}
+            {["💣", "⚡", "🐱", "🐭", "✨", "💥"][i % 6]}
           </div>
         ))}
       </div>
@@ -178,7 +195,7 @@ export default function Lobby({ onStartGame }: Props) {
           </div>
           <h1
             className="font-display text-4xl sm:text-6xl text-white leading-none mb-1 sm:mb-2"
-            style={{ textShadow: '0 0 35px rgba(255,200,0,0.45)' }}
+            style={{ textShadow: "0 0 35px rgba(255,200,0,0.45)" }}
           >
             🎉 Hot Potato
           </h1>
@@ -190,14 +207,18 @@ export default function Lobby({ onStartGame }: Props) {
         {/* ────────────────────────────────────────────────────────────────── */}
         {/* VIEW 1: หน้าเมนูหลัก (MAIN MENU) */}
         {/* ────────────────────────────────────────────────────────────────── */}
-        {view === 'MAIN' && (
+        {view === "MAIN" && (
           <div className="bg-white/5 border border-white/10 rounded-2xl sm:rounded-3xl p-4 sm:p-7 backdrop-blur-md shadow-2xl">
             {/* Input ชื่อผู้เล่น */}
             <div className="mb-5">
-              <label className="block text-white/70 text-xs uppercase tracking-wider mb-2 font-medium">
+              <label
+                htmlFor="player-name-input"
+                className="block text-white/70 text-xs uppercase tracking-wider mb-2 font-medium"
+              >
                 ชื่อของคุณ (Player Name):
               </label>
               <input
+                id="player-name-input"
                 type="text"
                 value={playerName}
                 maxLength={16}
@@ -220,8 +241,8 @@ export default function Lobby({ onStartGame }: Props) {
                     onClick={() => setTotalRounds(r)}
                     className={`py-2.5 rounded-xl border font-display text-lg transition-all ${
                       totalRounds === r
-                        ? 'bg-yellow-400 text-black border-yellow-400 font-bold shadow-[0_0_15px_rgba(255,200,0,0.3)]'
-                        : 'bg-white/5 text-white/70 border-white/10 hover:border-white/30'
+                        ? "bg-yellow-400 text-black border-yellow-400 font-bold shadow-[0_0_15px_rgba(255,200,0,0.3)]"
+                        : "bg-white/5 text-white/70 border-white/10 hover:border-white/30"
                     }`}
                   >
                     {r} Rounds
@@ -242,7 +263,7 @@ export default function Lobby({ onStartGame }: Props) {
 
               <button
                 type="button"
-                onClick={() => setView('JOIN')}
+                onClick={() => setView("JOIN")}
                 className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:brightness-110 active:scale-98 transition-all rounded-2xl py-3.5 text-white font-display text-xl font-bold shadow-lg shadow-violet-600/20 flex items-center justify-center gap-2 cursor-pointer"
               >
                 <span>🔑</span> ใส่รหัสเพื่อเข้าห้อง (Join Room)
@@ -262,17 +283,21 @@ export default function Lobby({ onStartGame }: Props) {
         {/* ────────────────────────────────────────────────────────────────── */}
         {/* VIEW 2: หน้ากรอกรหัสห้อง (JOIN ROOM) */}
         {/* ────────────────────────────────────────────────────────────────── */}
-        {view === 'JOIN' && (
+        {view === "JOIN" && (
           <div className="bg-white/5 border border-white/10 rounded-2xl sm:rounded-3xl p-4 sm:p-7 backdrop-blur-md shadow-2xl">
             <h2 className="font-display text-white text-xl sm:text-2xl text-center mb-3 sm:mb-4">
               🔑 เข้าร่วมห้องเล่นเกม
             </h2>
 
             <div className="mb-4">
-              <label className="block text-white/70 text-xs uppercase tracking-wider mb-2 font-medium">
+              <label
+                htmlFor="room-code-input"
+                className="block text-white/70 text-xs uppercase tracking-wider mb-2 font-medium"
+              >
                 กรอกรหัสห้อง 4 หลัก (Room Code):
               </label>
               <input
+                id="room-code-input"
                 type="text"
                 value={roomCodeInput}
                 onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
@@ -301,7 +326,9 @@ export default function Lobby({ onStartGame }: Props) {
                 {isConnecting ? (
                   <>
                     <span className="animate-spin text-xl">⏳</span>
-                    <span className="text-base sm:text-lg">{connectStatusText || 'กำลังค้นหาห้อง...'}</span>
+                    <span className="text-base sm:text-lg">
+                      {connectStatusText || "กำลังค้นหาห้อง..."}
+                    </span>
                   </>
                 ) : (
                   <>
@@ -314,9 +341,9 @@ export default function Lobby({ onStartGame }: Props) {
                 type="button"
                 disabled={isConnecting}
                 onClick={() => {
-                  setErrorMsg('');
-                  setIsConnecting(false);
-                  setView('MAIN');
+                  setErrorMsg("")
+                  setIsConnecting(false)
+                  setView("MAIN")
                 }}
                 className="w-full bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl py-2.5 sm:py-3 text-white/70 font-medium text-xs sm:text-sm transition-all cursor-pointer min-h-[44px]"
               >
@@ -329,7 +356,7 @@ export default function Lobby({ onStartGame }: Props) {
         {/* ────────────────────────────────────────────────────────────────── */}
         {/* VIEW 3: ห้องพักคอย (WAITING ROOM LOBBY) */}
         {/* ────────────────────────────────────────────────────────────────── */}
-        {view === 'WAITING' && (
+        {view === "WAITING" && (
           <div className="bg-white/5 border border-white/10 rounded-2xl sm:rounded-3xl p-4 sm:p-7 backdrop-blur-md shadow-2xl">
             {/* กล่องแสดง Room Code ขนาดใหญ่ */}
             <div className="bg-black/40 border border-white/15 rounded-2xl p-3 sm:p-4 mb-4 sm:mb-5 text-center relative">
@@ -347,7 +374,7 @@ export default function Lobby({ onStartGame }: Props) {
                 onClick={handleCopyCode}
                 className="mt-2.5 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white/80 text-xs transition-all cursor-pointer"
               >
-                <span>📋</span> {copied ? 'คัดลอกเรียบร้อย!' : 'แตะเพื่อคัดลอกรหัส'}
+                <span>📋</span> {copied ? "คัดลอกเรียบร้อย!" : "แตะเพื่อคัดลอกรหัส"}
               </button>
             </div>
 
@@ -357,28 +384,30 @@ export default function Lobby({ onStartGame }: Props) {
                 👥 ผู้เล่นในห้อง ({players.length} / 50 คน)
               </div>
               <div className="text-xs text-yellow-400/90 font-medium">
-                {isHost ? '👑 คุณคือหัวหน้าห้อง' : '👤 สมาชิกในห้อง'}
+                {isHost ? "👑 คุณคือหัวหน้าห้อง" : "👤 สมาชิกในห้อง"}
               </div>
             </div>
 
             {/* รายชื่อผู้เล่นที่เข้ามาในห้อง */}
             <div className="max-h-52 overflow-y-auto space-y-2 pr-1 mb-5">
-              {players.map((p, index) => (
+              {players.map((p) => (
                 <div
                   key={p.id}
                   className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl border ${
                     p.id === network.localPlayer?.id
-                      ? 'bg-yellow-400/15 border-yellow-400/40 text-yellow-200'
-                      : 'bg-white/5 border-white/10 text-white'
+                      ? "bg-yellow-400/15 border-yellow-400/40 text-yellow-200"
+                      : "bg-white/5 border-white/10 text-white"
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
                     <span
                       className="w-3.5 h-3.5 rounded-full shrink-0 border border-white/40"
-                      style={{ backgroundColor: `#${p.color.toString(16).padStart(6, '0')}` }}
+                      style={{
+                        backgroundColor: `#${p.color.toString(16).padStart(6, "0")}`,
+                      }}
                     />
                     <span className="font-medium text-sm">
-                      {p.name} {p.id === network.localPlayer?.id && '(คุณ)'}
+                      {p.name} {p.id === network.localPlayer?.id && "(คุณ)"}
                     </span>
                   </div>
                   <div>
@@ -413,7 +442,10 @@ export default function Lobby({ onStartGame }: Props) {
                   เชื่อมต่อห้องสำเร็จแล้ว!
                 </div>
                 <div className="text-white/80 text-xs mt-1">
-                  หัวหน้าห้อง: <span className="text-yellow-300 font-semibold">{players.find((p) => p.isHost)?.name || 'Host'}</span>
+                  หัวหน้าห้อง:{" "}
+                  <span className="text-yellow-300 font-semibold">
+                    {players.find((p) => p.isHost)?.name || "Host"}
+                  </span>
                 </div>
                 <div className="text-yellow-300 font-display text-sm mt-3 flex items-center justify-center gap-2">
                   <span className="animate-spin text-base">⏳</span>
@@ -436,5 +468,5 @@ export default function Lobby({ onStartGame }: Props) {
         )}
       </div>
     </div>
-  );
+  )
 }
